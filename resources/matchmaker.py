@@ -5,7 +5,8 @@ import colorlog
 
 import discord
 from os import environ as env
-from discord.app_commands import Command, CommandTree
+from typing import List, Union, Optional
+from discord.app_commands import Command, CommandTree, errors
 from discord.ext import commands
 
 intents = discord.Intents.none()
@@ -14,6 +15,8 @@ intents.members = True
 
 member_cache_flags = discord.MemberCacheFlags().none()
 member_cache_flags.joined = True
+
+from .database import Database
 
 class MatchMaker(commands.Bot):
     def __init__(self):
@@ -34,9 +37,6 @@ class MatchMaker(commands.Bot):
         logger = colorlog.getLogger('bot')
         logger.info(f"Logged in - {self.user.name} ({self.application_id})")
         logger.info(f"Loaded {len([x for x in self.tree.walk_commands() if isinstance(x, Command)])} Commands")
-        
-        self.tree.copy_global_to(guild=discord.Object(id=1210700325619507240))
-        await self.tree.sync(guild=discord.Object(id=1210700325619507240))
         
     async def load_extensions(self):
         self._cogs_ = []
@@ -70,3 +70,6 @@ class MatchMaker(commands.Bot):
 class AppCommandTree(CommandTree[MatchMaker]):
     async def interaction_check(self, interaction: discord.Interaction[MatchMaker]) -> bool:
         return True
+    
+    async def on_error(self, interaction: discord.Interaction[MatchMaker], error: errors.AppCommandError) -> None:
+        raise error

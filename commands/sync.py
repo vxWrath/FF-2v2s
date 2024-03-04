@@ -19,7 +19,7 @@ class Sync(commands.Cog):
         
     @app_commands.command(name='extensions', description='(un)load the cogs & (un)sync the commands')
     @app_commands.describe(command="the command to execute", globally="whether to globally (un)sync the commands", guild="the guild to (un)sync")
-    @app_commands.check(owner_only)
+    #@app_commands.check(owner_only)
     async def sync(self, interaction: discord.Interaction[MatchMaker], 
                    command : Literal['load', 'sync', 'load & sync', 'unload', 'unsync'], 
                    globally: Optional[Literal["yes", "no"]]="no",
@@ -48,7 +48,7 @@ class Sync(commands.Cog):
                 log += f"{command.title()}ed & "
                 
                 if command == "load":
-                    await self.bot.load_commands()
+                    await self.bot.load_extensions()
                 
                 elif command == "sync":
                     if globally:
@@ -66,18 +66,18 @@ class Sync(commands.Cog):
                             self.bot.command_mentions[command.name] = command.mention
                         
                 elif command == "unload":
-                    await self.bot.unload_commands()
+                    await self.bot.unload_extensions()
                     await self.bot.load_extension("commands.sync")
                     
                 elif command == "unsync":
-                    await self.bot.unload_commands()
+                    await self.bot.unload_extensions()
                     
                     if globally:
                         app_commands = await self.bot.tree.sync()
                     else:
                         app_commands = await self.bot.tree.sync(guild=guild)
                         
-                    await self.bot.load_commands()
+                    await self.bot.load_extensions()
         except Exception as e:
             await interaction.followup.send(content="❌")
             raise e
