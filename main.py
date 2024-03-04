@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from resources.matchmaker import MatchMaker
+from resources import MatchMaker, Database
 
 class Formatter(colorlog.ColoredFormatter):
     def converter(self, timestamp):

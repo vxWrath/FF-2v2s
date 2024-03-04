@@ -54,7 +54,14 @@ class Database:
             health_check_interval = 30,
         )
         
-        loop.create_task(ping_loop(self.redis))
+    async def ping_loop(self):
+        while True:
+            try:
+                await asyncio.wait_for(self.redis.ping(), timeout=10)
+            except RedisConnectionError as e:
+                raise SystemError("Failed to connect to Redis.") from e
+
+            await asyncio.sleep(10)
            
     async def create[T](self, domain: str, item_id: str, cls: Type[T]) -> T:
         item = cls(**{"id": int(item_id)})
@@ -70,7 +77,6 @@ class Database:
         item = from_redis(await self.redis.hgetall(f"{domain}:{item_id}"))
             
         if not item:
-            print('mongo')
             item = await self.mongo.matchmaker[domain].find_one({"_id": str(item_id)})
             
             if item:
@@ -88,7 +94,7 @@ class Database:
             item.pop("_id")
             
         item["id"] = int(item_id)
-        return cls(**item)
+        return cls(**Object(item))
     
     async def update(self, domain: str, item_id: str, **aspects) -> None:
         setting   = {x: y for x, y in aspects.items() if y != None}
@@ -122,3 +128,11 @@ class Database:
             str(user.id),
             **{k: v for k, v in items.items() if k in update_keys}
         )
+        
+    async def produce_user(self, user_id: int):
+        user = await self.get_user(user_id)
+        
+        if user is None:
+            user = await self.create_user(user_id)
+            
+        return user

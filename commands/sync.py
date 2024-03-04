@@ -5,7 +5,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from resources.matchmaker import MatchMaker
+from resources import MatchMaker, Object
 
 logger = colorlog.getLogger('bot')
 
@@ -17,7 +17,11 @@ class Sync(commands.Cog):
     def __init__(self, bot: MatchMaker):
         self.bot = bot
         
-    @app_commands.command(name='extensions', description='(un)load the cogs & (un)sync the commands')
+    @app_commands.command(
+        name='extensions', 
+        description='(un)load the cogs & (un)sync the commands', 
+        extras=Object({})
+    )
     @app_commands.describe(command="the command to execute", globally="whether to globally (un)sync the commands", guild="the guild to (un)sync")
     #@app_commands.check(owner_only)
     async def sync(self, interaction: discord.Interaction[MatchMaker], 

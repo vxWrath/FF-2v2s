@@ -11,17 +11,18 @@ class BaseObject:
     __str__ = __repr__
     
 class Object(BaseObject, dict):
-    def __init__(self, dictionary: Optional[dict]=None, **kwargs):
+    def __init__(self, dictionary: Optional[dict]=None, convert_dt: Optional[bool]=True, **kwargs):
         dictionary = dictionary or {}  
         dictionary.update(kwargs)
         
         for key, val in dictionary.items():
             if isinstance(val, dict):
-                dictionary[key] = Object(val)
+                dictionary[key] = Object(val, convert_dt=convert_dt)
             elif isinstance(val, list):
-                dictionary[key] = ObjectArray(val)
-            elif isinstance(val, str) and not val.isdigit():
+                dictionary[key] = ObjectArray(val, convert_dt=convert_dt)
+            elif convert_dt and isinstance(val, str) and not val.isdigit():
                 try:
+                    print(convert_dt, val)
                     dictionary[key] = datetime.datetime.fromisoformat(val)
                 except ValueError:
                     pass
@@ -104,13 +105,13 @@ class Object(BaseObject, dict):
         }
         
 class ObjectArray(BaseObject, list):
-    def __init__(self, array: Dict[Any, Any]):
+    def __init__(self, array: Dict[Any, Any], convert_dt: Optional[bool]=True):
         for i in range(len(array)):
             if isinstance(array[i], dict):
-                array[i] = Object(array[i])
+                array[i] = Object(array[i], convert_dt=convert_dt)
             elif isinstance(array[i], list):
-                array[i] = ObjectArray(array[i])
-            elif isinstance(array[i], str) and not array[i].isdigit():
+                array[i] = ObjectArray(array[i], convert_dt=convert_dt)
+            elif convert_dt and isinstance(array[i], str) and not array[i].isdigit():
                 try:
                     array[i] = datetime.datetime.fromisoformat(array[i])
                 except ValueError:
