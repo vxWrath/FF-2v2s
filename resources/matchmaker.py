@@ -86,7 +86,9 @@ class AppCommandTree(CommandTree[MatchMaker]):
         command_extras     = Object(interaction.command.extras)
         
         if command_extras.defer:
-            await interaction.response.defer(ephemeral=command_extras.defer_ephemerally)
+            await interaction.response.defer(ephemeral=False)
+        elif command_extras.defer_ephemerally:
+            await interaction.response.defer(ephemeral=True)
             
         if command_extras.get_user_data:
             try:

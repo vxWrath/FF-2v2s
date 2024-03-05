@@ -20,7 +20,7 @@ class Sync(commands.Cog):
     @app_commands.command(
         name='extensions', 
         description='(un)load the cogs & (un)sync the commands', 
-        extras=Object({})
+        extras=Object(defer_ephemerally=True, get_user_data=False)
     )
     @app_commands.describe(command="the command to execute", globally="whether to globally (un)sync the commands", guild="the guild to (un)sync")
     #@app_commands.check(owner_only)
@@ -29,8 +29,6 @@ class Sync(commands.Cog):
                    globally: Optional[Literal["yes", "no"]]="no",
                    guild: Optional[str]=None
                 ):
-        await interaction.response.defer(ephemeral=True)
-        
         if guild and guild != "*":
             try:
                 int(guild)

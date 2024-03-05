@@ -13,7 +13,7 @@ class ViewTrophies(commands.Cog):
     @app_commands.command(
         name="viewtrophies", 
         description="view your or another person's trophy count",
-        extras = Object(defer=True, defer_ephemerally=True, get_user_data=True)
+        extras = Object(defer_ephemerally=True, get_user_data=True)
     )
     @app_commands.describe(user="the user to view")
     async def viewtrophies(self, interaction: discord.Interaction[MatchMaker], user: Optional[discord.User]=None):
