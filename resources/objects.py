@@ -1,34 +1,47 @@
 import datetime
+import json
+
 from typing import Dict, Any, Self, Optional
 
+from pydantic_core import core_schema
+from pydantic import BaseModel, GetCoreSchemaHandler
+
 class BaseObject:
-    def regular(self, to_redis: Optional[bool]=False):
+    @classmethod
+    def from_mongo(cls: Self) -> Self:
+        raise NotImplementedError()
+        
+    @classmethod
+    def from_redis(cls: Self) -> Self:
+        raise NotImplementedError()
+    
+    def to_mongo(self):
+        raise NotImplementedError()
+    
+    def to_redis(self):
+        raise NotImplementedError()
+        
+    def convert(self):
         raise NotImplementedError()
     
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.regular()})"
+        return f"{self.__class__.__name__}({self.convert()})"
     
     __str__ = __repr__
     
 class Object(BaseObject, dict):
-    def __init__(self, dictionary: Optional[dict]=None, convert_dt: Optional[bool]=True, **kwargs):
-        dictionary = dictionary or {}  
-        dictionary.update(kwargs)
+    def __init__(self, mapping: Optional[dict]=None, **kwargs):
+        mapping = mapping or {}
+        mapping.update(kwargs)
         
-        for key, val in dictionary.items():
+        for key, val in mapping.items():
             if isinstance(val, dict):
-                dictionary[key] = Object(val, convert_dt=convert_dt)
+                mapping[key] = Object(val)
             elif isinstance(val, list):
-                dictionary[key] = ObjectArray(val, convert_dt=convert_dt)
-            elif convert_dt and isinstance(val, str) and not val.isdigit():
-                try:
-                    print(convert_dt, val)
-                    dictionary[key] = datetime.datetime.fromisoformat(val)
-                except ValueError:
-                    pass
+                mapping[key] = ObjectArray(val)
         
-        super().__init__(dictionary)
-        
+        super().__init__(mapping)
+    
     def __getattr__(self, __key: Any) -> Any:
         return self.get(__key, None)
     
@@ -91,44 +104,147 @@ class Object(BaseObject, dict):
     def has(self, __key: Any) -> bool:
         return __key in self.keys()
         
-    def regular(self, to_redis: Optional[bool]=False):
-        if to_redis:
-            return {
-                key: val.regular(to_redis=to_redis) if isinstance(val, (Object, ObjectArray))
-                else val.isoformat() if isinstance(val, datetime.datetime)
-                else val for key, val in self.items()
-            }
+    @classmethod
+    def from_mongo(cls: Self, mapping: dict) -> Self:
+        for key, val in mapping.items():
+            if isinstance(val, str):
+                if val.isdigit():
+                    mapping[key] = int(val)
+                elif val.replace('.', '').isdigit():
+                    mapping[key] = float(val)
+                else:
+                    try:
+                        mapping[key] = datetime.datetime.fromisoformat(val)
+                    except ValueError:
+                        pass
+                    
+        return cls(mapping)
+                    
+    @classmethod
+    def from_redis(cls: Self, mapping: dict) -> Self:
+        for key, val in mapping.items():
+            if isinstance(val, str):
+                try:
+                    mapping[key] = datetime.datetime.fromisoformat(val)
+                except ValueError:
+                    pass
+                
+                try:
+                    mapping[key] = json.loads(val)
+                except json.JSONDecodeError:
+                    mapping[key] = val
+                        
+        return cls(mapping)
         
+    def to_mongo(self) -> dict:
+        mapping = {}
+        for key, val in self.items():
+            if isinstance(val, (int, float)):
+                mapping[key] = str(val)
+            elif isinstance(val, datetime.datetime):
+                mapping[key] = val.isoformat()
+            elif isinstance(val, BaseObject):
+                mapping[key] = val.to_mongo()
+            else:
+                mapping[key] = val
+                
+        return mapping
+        
+    def to_redis(self) -> dict:
+        mapping = {}
+        for key, val in self.items():
+            if val == None:
+                continue
+            
+            if isinstance(val, datetime.datetime):
+                mapping[key] = val.isoformat()
+            elif isinstance(key, BaseObject):
+                mapping[key] = json.dumps(val.to_redis())
+            else:
+                mapping[key] = json.dumps(val)
+                
+        return mapping
+        
+    def convert(self) -> dict:
         return {
-            key: val.regular() if isinstance(val, (Object, ObjectArray))
-            else val for key, val in self.items()
+            key: val.convert() if isinstance(val, BaseObject) else val
+            for key, val in self.items()
         }
         
 class ObjectArray(BaseObject, list):
-    def __init__(self, array: Dict[Any, Any], convert_dt: Optional[bool]=True):
+    def __init__(self, array: Optional[list]=None, *args):
+        array = array or []
+        array.extend(list(args))
+        
         for i in range(len(array)):
             if isinstance(array[i], dict):
-                array[i] = Object(array[i], convert_dt=convert_dt)
+                array[i] = Object(array[i])
             elif isinstance(array[i], list):
-                array[i] = ObjectArray(array[i], convert_dt=convert_dt)
-            elif convert_dt and isinstance(array[i], str) and not array[i].isdigit():
-                try:
-                    array[i] = datetime.datetime.fromisoformat(array[i])
-                except ValueError:
-                    pass
+                array[i] = ObjectArray(array[i])
 
         super().__init__(array)
         
-    def regular(self, to_redis: Optional[bool]=False):
-        if to_redis:
-            return [
-                x.regular(to_redis=to_redis) if isinstance(x, (Object, ObjectArray)) 
-                else x.isoformat() if isinstance(x, datetime.datetime)
-                else x for x in self
-            ]
+    @classmethod
+    def from_mongo(cls: Self, array: list) -> Self:
+        for i in range(len(array)):
+            if isinstance(array[i], str):
+                if array[i].isdigit():
+                    array[i] = int(array[i])
+                elif array[i].replace('.', '').isdigit():
+                    array[i] = float(array[i])
+                else:
+                    try:
+                        array[i] = datetime.datetime.fromisoformat(array[i])
+                    except ValueError:
+                        pass
+                    
+        return cls(array)
+        
+    @classmethod
+    def from_redis(cls: Self, array: list) -> Self:
+        for i in range(len(array)):
+            if isinstance(array[i], str):
+                try:
+                    array[i] = datetime.datetime.fromisoformat(i)
+                except ValueError:
+                    pass
+                
+                try:
+                    array[i] = json.loads(i)
+                except json.JSONDecodeError:
+                    pass
+                        
+        return cls(array)
+    
+    def to_mongo(self) -> list:
+        array = []
+        for i in range(len(self)):
+            if isinstance(self[i], (int, float)):
+                array[i] = str(self[i])
+            elif isinstance(self[i], datetime.datetime):
+                array[i] = self[i].isoformat()
+            elif isinstance(self[i], BaseObject):
+                array[i] = self[i].to_mongo()
+            else:
+                array[i] = self[i]
+                
+        return array
+    
+    def to_redis(self) -> list:
+        array = []
+        for i in range(len(self)):
+            if self[i] == None:
+                continue
             
+            if isinstance(self[i], datetime.datetime):
+                array[i] = self[i].isoformat()
+            elif isinstance(self[i], BaseObject):
+                array[i] = json.dumps(self[i].to_redis())
+            else:
+                array[i] = json.dumps(self[i])
+        
+    def convert(self) -> list: 
         return [
-            x.regular() if isinstance(x, (Object, ObjectArray)) 
-            else x for x in self
+            x.convert() if isinstance(x, BaseObject) else x
+            for x in self
         ]
-
