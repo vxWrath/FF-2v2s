@@ -26,7 +26,7 @@ class User(Model):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
     id: int
-    robloxID: Optional[str] = None
+    roblox_id: Optional[str] = None
     region: Optional[int] = Region(1).value
     
     trophies: Optional[int] = 500

@@ -36,9 +36,8 @@ async def main():
         bot_logger.info("Turning Off...")
         
         await bot.close()
-        
-        if bot.database:
-            await bot.database.close()
+        await bot.database.redis.aclose()
+        await bot.external_session.close()
             
         bot_logger.info("Turned Off!")
         

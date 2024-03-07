@@ -1,4 +1,5 @@
 import asyncio
+import aiohttp
 import os
 import sys
 import colorlog
@@ -16,7 +17,9 @@ intents.members = True
 member_cache_flags = discord.MemberCacheFlags().none()
 member_cache_flags.joined = True
 
-from .database import Database, Object
+from .database import Database
+from .objects import Object
+from .roblox import RobloxClient
 
 class MatchMaker(commands.Bot):
     def __init__(self):
@@ -29,10 +32,13 @@ class MatchMaker(commands.Bot):
             chunk_guilds_at_startup = True # turn this off if the bot gets big
         )
         
+        self.external_session: aiohttp.ClientSession = aiohttp.ClientSession()
         self.database: Database = Database(self.loop)
         
     async def setup_hook(self) -> None:
         self.loop.create_task(self.database.ping_loop())
+        self.roblox_client = RobloxClient(self.external_session)
+
         await self.load_extensions()
         
         logger = colorlog.getLogger('bot')
@@ -83,23 +89,23 @@ class AppCommandTree(CommandTree[MatchMaker]):
         
         interaction.data   = Object(interaction.data, convert_dt=False)
         interaction.extras = Object(interaction.extras)
-        command_extras     = Object(interaction.command.extras)
+        extras             = Object(interaction.command.extras if interaction.command else interaction.extras['extras'])
         
-        if command_extras.defer:
-            await interaction.response.defer(ephemeral=False)
-        elif command_extras.defer_ephemerally:
-            await interaction.response.defer(ephemeral=True)
+        if extras.defer:
+            await interaction.response.defer(ephemeral=False, thinking=extras.thinking or False)
+        elif extras.defer_ephemerally:
+            await interaction.response.defer(ephemeral=True, thinking=extras.thinking or False)
             
-        if command_extras.get_user_data:
+        if extras.get_user_data:
             try:
                 async with asyncio.timeout(2):
                     interaction.extras.users = Object({
                         interaction.user.id: await self.client.database.produce_user(interaction.user.id)
                     })
                     
-                    if interaction.data.resolved and (interaction.data.resolved.members or interaction.data.resolved.users):
-                        for user_id, user_data in (interaction.data.resolved.members or interaction.data.resolved.users).items():
-                            if user_data.get('bot', False):
+                    if interaction.data.resolved:
+                        for user_id, user_data in (interaction.data.resolved.members or interaction.data.resolved.users or {}).items():
+                            if user_data.get('bot', False) or interaction.user.id == int(user_id):
                                 continue
                             
                             interaction.extras.users[int(user_id)] = await self.client.database.produce_user(int(user_id))

@@ -3,9 +3,6 @@ import json
 
 from typing import Dict, Any, Self, Optional
 
-from pydantic_core import core_schema
-from pydantic import BaseModel, GetCoreSchemaHandler
-
 class BaseObject:
     @classmethod
     def from_mongo(cls: Self) -> Self:
