@@ -46,7 +46,7 @@ class MatchMaker(commands.Bot):
         logger.info(f"Loaded {len([x for x in self.tree.walk_commands() if isinstance(x, Command)])} Commands")
         
     async def load_extensions(self):
-        self._cogs_ = []
+        self._cogs_ = ["resources.utils"]
         
         for cog in self._cogs_:
             try:

@@ -1,6 +1,7 @@
 from typing import Any, Optional
 
 import discord
+from colorthief import ColorThief
 from discord.ext.commands import Bot as MatchMaker
 
 from .objects import Object
@@ -16,7 +17,11 @@ class BaseView(discord.ui.View):
         if interaction.channel.type == discord.ChannelType.private:
             return True
         
-        interaction.extras['extras'] = self.extras
+        if self.extras.custom_id_data and interaction.data['custom_id'].split(':')[0] in self.extras.custom_id_data.keys():
+            interaction.extras['extras'] = self.extras.custom_id_data[interaction.data['custom_id'].split(':')[0]]
+        else:
+            interaction.extras['extras'] = self.extras
+        
         if not await interaction.client.tree.interaction_check(interaction):
             return False
         
@@ -75,3 +80,26 @@ class BaseModal(discord.ui.Modal):
         
     async def on_error(self, interaction: discord.Interaction, error: Exception):
         await interaction.client.tree.on_error(interaction, error)
+        
+class Colors:
+    blue    = discord.Color.from_str("#5896ff")
+    blank   = discord.Color.from_str("#2B2D31")
+    
+    @staticmethod
+    async def image_to_color(client: MatchMaker, file) -> discord.Color:
+        if file is None:
+            return Colors.blank
+        
+        try:
+            if isinstance(file, discord.Asset):
+                file  = await file.to_file()
+                
+            image = ColorThief(file.fp)
+            rgb   = await client.loop.run_in_executor(None, image.get_color, 1)
+            
+            return discord.Color.from_rgb(*rgb)
+        except Exception:
+            return Colors.blank
+        
+async def setup(bot: MatchMaker):
+    pass
