@@ -15,15 +15,6 @@ from .models import User
 
 MONGO_URL = env['MONGO_URL']
 REDIS_PASSWORD = env['REDIS_PASSWORD']
-
-async def ping_loop(redis: Redis):
-    while True:
-        try:
-            await asyncio.wait_for(redis.ping(), timeout=10)
-        except RedisConnectionError as e:
-            raise SystemError("Failed to connect to Redis.") from e
-
-        await asyncio.sleep(10)
         
 class Database:
     def __init__(self, loop: asyncio.AbstractEventLoop):
@@ -50,16 +41,16 @@ class Database:
         item = cls(**{"id": int(item_id)})
         
         try:
-            await self.mongo.matchmaker[domain].insert_one({"_id": str(item_id)} | item.dump_without_id())
+            await self.mongo.matchmaker[domain].insert_one({"_id": str(item_id)} | item.dump_without_id().to_mongo())
         except DuplicateKeyError:
             pass
             
         return item
         
-    async def get[T](self, domain: str, item_id: str, cls: Type[T]) -> Optional[T]:
+    async def get[T](self, domain: str, item_id: str, cls: Type[T], mongo: bool) -> Optional[T]:
         item = Object.from_redis((await self.redis.hgetall(f"{domain}:{item_id}")) or {})
             
-        if not item:
+        if mongo and not item:
             item = Object.from_mongo((await self.mongo.matchmaker[domain].find_one({"_id": str(item_id)}) or {}))
             
             if item:
@@ -76,10 +67,10 @@ class Database:
         if item.get("_id"):
             item.pop("_id")
             
-        item["id"] = int(item_id)
+        item["id"] = int(item_id) if item_id.isdigit() else item_id
         return cls(**item)
     
-    async def update(self, domain: str, item_id: str, **aspects) -> None:
+    async def update(self, domain: str, item_id: str, mongo: bool, **aspects) -> None:
         setting   = Object({x: y for x, y in aspects.items() if y != None})
         unsetting = Object({x: y for x, y in aspects.items() if y == None})
         
@@ -94,14 +85,15 @@ class Database:
                 
         if unsetting:
             await self.redis.hdel(f"{domain}:{item_id}", *unsetting.keys())
-            
-        await self.mongo.matchmaker[domain].update_one({"_id": str(item_id)}, {"$set": setting.to_mongo(), "$unset": unsetting.to_mongo()})
+        
+        if mongo:
+            await self.mongo.matchmaker[domain].update_one({"_id": str(item_id)}, {"$set": setting.to_mongo(), "$unset": unsetting.to_mongo()})
         
     async def create_user(self, user_id: int) -> User:
         return await self.create("users", str(user_id), User)
     
     async def get_user(self, user_id: int) -> Optional[User]:
-        return await self.get("users", str(user_id), User)
+        return await self.get("users", str(user_id), User, True)
     
     async def update_user(self, user: User, update_keys: Optional[List[str]]=None) -> None:
         items = user.dump_without_id()
@@ -110,12 +102,14 @@ class Database:
             return await self.update(
                 "users",
                 str(user.id),
+                True,
                 **{k: v for k, v in items.items() if k in update_keys}
             )
             
         return await self.update(
             "users",
             str(user.id),
+            True
             **items
         )
         

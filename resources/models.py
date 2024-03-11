@@ -1,6 +1,6 @@
 from typing_extensions import Literal
 from pydantic import BaseModel, Field, ConfigDict, field_serializer
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from enum import Enum
 
 from .objects import Object
@@ -15,7 +15,7 @@ class Model(BaseModel):
         dump = super().model_dump(*args, **kwargs)
         return Object(dump)
     
-    def dump_without_id(self):
+    def dump_without_id(self) -> Object:
         item = self.model_dump()
         item.pop('id', None)
         item.pop('_id', None)
@@ -26,13 +26,23 @@ class User(Model):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
     id: int
-    roblox_id: Optional[str] = None
-    region: Optional[int] = Region(1).value
-    
-    trophies: Optional[int] = 500
+    roblox_id: Optional[int] = None
+    trophies: Optional[int] = 0
     inactive_for: Optional[int] = 0
     bonus: Optional[int] = 0
+
+    settings: Optional[Object] = Field(default_factory=lambda: Object(
+        region = 1, 
+        queue_requests = True, 
+        queue_request_whitelist = [],
+        queue_request_blacklist = [], 
+    ))
+    
     season: Optional[Object] = Field(default_factory=lambda: Object({}))
+    
+    @field_serializer("settings")
+    def settings_to_dict(mapping: Object):
+        return mapping.convert()
     
     @field_serializer("season")
     def season_to_dict(mapping: Object):

@@ -7,7 +7,7 @@ from typing import Optional
 import random
 import uuid
 
-from resources import MatchMaker, Object, User, RobloxUser, BaseView, BaseModal, Colors
+from resources import MatchMaker, Object, User, RobloxUser, BaseView, BaseModal, Colors, Region
 
 ROBLOX_NAME = re.compile(r"^(?=^\w{3,20}$)[a-z0-9]+_?[a-z0-9]+$", flags=re.IGNORECASE)
 
@@ -40,6 +40,8 @@ class GetRobloxUsername(BaseModal):
         
         if self.verifying:
             await interaction.response.edit_message(content=f"🔎 *Searching...*", view=None, embed=None)
+        else:
+            await interaction.response.send_message(content=f"🔎 *Searching...*", ephemeral=True)
             
         rblx = await interaction.client.roblox_client.get_user_by_name(name)
             
@@ -48,8 +50,8 @@ class GetRobloxUsername(BaseModal):
 
         if self.verifying:
             self.view.stop()
-        #else:
-        #    self.view._refresh_timeout()
+        else:
+            self.view._refresh_timeout()
         
         avatars = await interaction.client.roblox_client.get_users_avatar([rblx.id])
         
@@ -74,6 +76,7 @@ class VerifyRobloxAccount(BaseView):
         
     @ui.button(label="Yes, Continue", style=discord.ButtonStyle.green)
     async def yes(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+        self.stop()
         words = ' '.join(random.choices(word_bank, k=10))
         
         embed = discord.Embed(
@@ -89,9 +92,9 @@ class VerifyRobloxAccount(BaseView):
         if self.verifying:
             self.view.stop()
             view = self
-        #else:
-        #    self.view._refresh_timeout()
-        #    view = self.view
+        else:
+            self.view._refresh_timeout()
+            view = self.view
         
         await interaction.response.edit_message(embed=embed, view=CompleteVerification(interaction, view, self.verifying, self.rblx, self.avatar_url, words))
     
@@ -99,8 +102,8 @@ class VerifyRobloxAccount(BaseView):
     async def no(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
         if self.verifying:
             self.view.stop()
-        #else:
-        #    self.view._refresh_timeout()
+        else:
+            self.view._refresh_timeout()
         
         await interaction.response.send_modal(GetRobloxUsername(interaction, self, self.verifying))
         
@@ -118,8 +121,9 @@ class CompleteVerification(BaseView):
     async def done(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
         message = await interaction.followup.send(content=f"🔎 *Getting info...*", ephemeral=True, wait=True)
         rblx    = await interaction.client.roblox_client.get_user(self.rblx.id)
+        data    = interaction.extras['users'][interaction.user.id]
         
-        if self.words not in rblx.description:
+        if self.words.lower() not in rblx.description.lower():
             return await message.edit(content="❌ **I couldn't find those words in your description**")
         
         embed = discord.Embed(
@@ -130,15 +134,45 @@ class CompleteVerification(BaseView):
         
         await message.delete()
         await interaction.edit_original_response(embed=embed, view=None)
+        
+        data.roblox_id = rblx.id
+        await interaction.client.database.update_user(data, "roblox_id")
+        
+        self.stop()
+        
+        if self.verifying:
+            self.view.stop()
+        else:
+            content = (
+                f"## Account Settings\n"
+                f"`Match Making Region:` **{Region(data.region).name.replace('_', ' ')}**\n"
+                f"`Roblox Account:` **{rblx.name}** ({rblx.id})\n"
+            )
+            
+            await self.view.interaction.edit_original_response(content=content)
     
     @ui.button(label="Stop, Restart", style=discord.ButtonStyle.red)
     async def restart(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
         if self.verifying:
             self.view.stop()
-        #else:
-        #    self.view._refresh_timeout()
+        else:
+            self.view._refresh_timeout()
         
-        await interaction.response.send_modal(GetRobloxUsername(interaction, self, self.verifying))
+        await interaction.response.send_modal(GetRobloxUsername(interaction, self.view, self.verifying))
+
+class ChangeAccountSettings(BaseView):
+    @ui.select(cls=ui.Select, placeholder="Change Settings", options=[
+        discord.SelectOption(label="Change roblox account", value="roblox"),
+        discord.SelectOption(label="Change region", value="region"),
+        discord.SelectOption(label="Change queue request status", value="queue"),
+        discord.SelectOption(label="View/Edit queue request whitelist", value="whitelist"),
+        discord.SelectOption(label="View/Edit queue request blacklist", value="blacklist"),
+    ])
+    async def change_settings(self, interaction: discord.Interaction[MatchMaker], _: discord.SelectMenu):
+        if self.change_settings.values[0] == "roblox":
+            return await interaction.response.send_modal(GetRobloxUsername(interaction, self, False))
+        
+        await interaction.response.send_message(content="*Not Done*", ephemeral=True)
 
 class ManageAccount(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -159,7 +193,16 @@ class ManageAccount(commands.Cog):
                 view    = Unverified(120, interaction)
             )
             
-        await interaction.followup.send(content=f"**{str(rblx)}**", ephemeral=True)
+        content = (
+            f"## Account Settings\n"
+            f"`Roblox Account:` **{rblx.name}** ({rblx.id})\n"
+            f"`Match Making Region:` **{Region(data.settings.region).name.replace('_', ' ')}**\n\n"
+            f"`Queue Requests:` {'✅' if data.settings.queue_requests else '❌'}\n"
+            f"`Queue Request Whitelist:` **{len(data.settings.queue_request_whitelist)} members**\n"
+            f"`Queue Request Blacklist:` **{len(data.settings.queue_request_blacklist)} members**\n"
+        )
+            
+        await interaction.followup.send(content=content, view=ChangeAccountSettings(300, interaction))
         
 async def setup(bot: MatchMaker):
     cog = ManageAccount(bot)

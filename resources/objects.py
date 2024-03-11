@@ -104,7 +104,9 @@ class Object(BaseObject, dict):
     @classmethod
     def from_mongo(cls: Self, mapping: dict) -> Self:
         for key, val in mapping.items():
-            if isinstance(val, str):
+            if isinstance(val, dict):
+                mapping[key] = cls.from_mongo(val)
+            elif isinstance(val, str):
                 if val.isdigit():
                     mapping[key] = int(val)
                 elif val.replace('.', '').isdigit():
@@ -136,7 +138,7 @@ class Object(BaseObject, dict):
     def to_mongo(self) -> dict:
         mapping = {}
         for key, val in self.items():
-            if isinstance(val, (int, float)):
+            if not isinstance(val, bool) and isinstance(val, (int, float)):
                 mapping[key] = str(val)
             elif isinstance(val, datetime.datetime):
                 mapping[key] = val.isoformat()
