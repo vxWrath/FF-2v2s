@@ -82,6 +82,7 @@ class BaseModal(discord.ui.Modal):
         await interaction.client.tree.on_error(interaction, error)
         
 class Colors:
+    white   = discord.Color.from_str("#FFFFFF")
     blue    = discord.Color.from_str("#5896ff")
     blank   = discord.Color.from_str("#2B2D31")
     

@@ -4,9 +4,12 @@ from typing import Optional, List, Type
 import asyncio
 import json
 import datetime
+import subprocess
+import sys
 
 from redis.asyncio import Redis
 from redis import ConnectionError as RedisConnectionError
+from redis import AuthenticationError as RedisAuthenticationError
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import DuplicateKeyError
 
@@ -17,7 +20,7 @@ MONGO_URL = env['MONGO_URL']
 REDIS_PASSWORD = env['REDIS_PASSWORD']
         
 class Database:
-    def __init__(self, loop: asyncio.AbstractEventLoop):
+    def __init__(self):
         self.mongo = AsyncIOMotorClient(MONGO_URL, tz_aware=True)
         self.mongo.get_io_loop = asyncio.get_running_loop
         
@@ -29,11 +32,22 @@ class Database:
         )
         
     async def ping_loop(self):
+        errors = 0
         while True:
             try:
                 await asyncio.wait_for(self.redis.ping(), timeout=10)
+            except RedisAuthenticationError as e:
+                self.redis = Redis(
+                    decode_responses = True,
+                    retry_on_timeout = True,
+                    health_check_interval = 30,
+                )
             except RedisConnectionError as e:
-                raise SystemError("Failed to connect to Redis.") from e
+                if errors > 0 or sys.platform != 'win32':
+                    raise SystemError("Failed to connect to Redis.") from e
+                else:
+                    errors += 1
+                    subprocess.run("wsl sudo -S sudo service redis-server start", input=f"{REDIS_PASSWORD}\n\n".encode(), shell=True)
 
             await asyncio.sleep(10)
            

@@ -6,7 +6,7 @@ import colorlog
 
 import discord
 from os import environ as env
-from typing import List, Union, Optional
+from typing import Dict, Any
 from discord.app_commands import Command, CommandTree, errors
 from discord.ext import commands
 
@@ -19,6 +19,7 @@ member_cache_flags.joined = True
 
 from .database import Database
 from .objects import Object
+from .queue import Queue
 from .roblox import RobloxClient
 
 class MatchMaker(commands.Bot):
@@ -33,7 +34,9 @@ class MatchMaker(commands.Bot):
         )
         
         self.external_session: aiohttp.ClientSession = aiohttp.ClientSession()
-        self.database: Database = Database(self.loop)
+        self.database: Database = Database()
+        self.queuer: Queue = Queue()
+        self.states: Dict[int, Any] = Object({})
         
     async def setup_hook(self) -> None:
         self.loop.create_task(self.database.ping_loop())
@@ -87,7 +90,7 @@ class AppCommandTree(CommandTree[MatchMaker]):
             
             return False
         
-        interaction.data   = Object(interaction.data, convert_dt=False)
+        interaction.data   = Object(interaction.data)
         interaction.extras = Object(interaction.extras)
         extras             = Object(interaction.command.extras if interaction.command else interaction.extras['extras'])
         

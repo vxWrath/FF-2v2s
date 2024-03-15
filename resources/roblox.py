@@ -67,3 +67,6 @@ class RobloxClient:
         })
         
         return {x['targetId']: x['imageUrl'] for x in data['data']}
+    
+    async def verify_private_server(self, url: str):
+        pass

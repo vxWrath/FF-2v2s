@@ -145,7 +145,7 @@ class CompleteVerification(BaseView):
         else:
             content = (
                 f"## Account Settings\n"
-                f"`Match Making Region:` **{Region(data.region).name.replace('_', ' ')}**\n"
+                f"`Match Making Region:` **{Region(data.region).name}**\n"
                 f"`Roblox Account:` **{rblx.name}** ({rblx.id})\n"
             )
             
@@ -196,13 +196,14 @@ class ManageAccount(commands.Cog):
         content = (
             f"## Account Settings\n"
             f"`Roblox Account:` **{rblx.name}** ({rblx.id})\n"
-            f"`Match Making Region:` **{Region(data.settings.region).name.replace('_', ' ')}**\n\n"
+            f"`Match Making Region:` **{Region(data.settings.region).name}**\n\n"
+            f"`Private Server:` {f"**[Link]({data.settings.private_server_url})**" if data.settings.private_server_url else '❌'}\n\n"
             f"`Queue Requests:` {'✅' if data.settings.queue_requests else '❌'}\n"
             f"`Queue Request Whitelist:` **{len(data.settings.queue_request_whitelist)} members**\n"
             f"`Queue Request Blacklist:` **{len(data.settings.queue_request_blacklist)} members**\n"
         )
             
-        await interaction.followup.send(content=content, view=ChangeAccountSettings(300, interaction))
+        await interaction.followup.send(content=content, view=ChangeAccountSettings(300, interaction), suppress_embeds=True)
         
 async def setup(bot: MatchMaker):
     cog = ManageAccount(bot)
