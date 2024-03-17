@@ -139,7 +139,12 @@ class TeammateSelection(BaseView):
             )
             
         interaction = view.interaction
-        embed.description += "\n## <a:loading:1217310863623585832> Finding Game..."
+        timeout     = datetime.timedelta(seconds=30)#datetime.timedelta(minutes=10)
+
+        embed.description += (
+            "\n## <a:loading:1217310863623585832> Finding Game...\n"
+            f"*You will be kicked out of the queue {discord.utils.format_dt(discord.utils.utcnow() + timeout, "R")}*"
+        )
         
         try:
             await invitation_view.interaction.delete_original_response()
@@ -162,26 +167,38 @@ class TeammateSelection(BaseView):
                 content = f"**You can't queue up with {other_user.mention} anymore because they have their DMs closed**"
             )
         
-        player_one_cancel = CancelMatchmaking(600, interaction)
+        timeout_task = interaction.client.loop.create_task(asyncio.sleep(timeout.total_seconds()))
+        
+        player_one_cancel = CancelMatchmaking(timeout.total_seconds(), interaction)
         player_one_task   = interaction.client.loop.create_task(player_one_cancel.wait())
         await interaction.response.edit_message(embed=embed, view=player_one_cancel)
 
         team  = Object(player_one=interaction.user, player_two=other_user, region=other_data.settings.region, trophies=trophies)
         queue = interaction.client.loop.create_task(interaction.client.queuer.join_queue(team, interaction.client.loop))
         
-        done, pending = await asyncio.wait([player_one_task, player_two_task, queue], timeout=None, return_when=asyncio.FIRST_COMPLETED)
+        done, pending = await asyncio.wait([player_one_task, player_two_task, queue, timeout_task], timeout=None, return_when=asyncio.FIRST_COMPLETED)
         result = done.pop()
+
+        if result != queue:
+            interaction.client.states.pop(interaction.user.id)
+            interaction.client.states.pop(other_user.id)
+
+            item = [x for x in interaction.client.queuer.queue if x.team == team][0]
+            item.future.set_result(None)
+
+            interaction.client.queuer.queue.remove(item)
         
         for task in pending:
             task.cancel()
             
         player_one_cancel.stop()
         player_two_cancel.stop()
+
+        if result == timeout_task:
+            await message.edit(content=f"❌ **Matchmaking took too long**", embed=None, view=None, delete_after=120)
+            return await interaction.edit_original_response(content=f"❌ **Matchmaking took too long**", embed=None, view=None)
         
         if result == player_one_task:
-            interaction.client.states.pop(interaction.user.id)
-            interaction.client.states.pop(other_user.id)
-            
             await player_one_cancel.interaction.response.edit_message(
                 content = f"❌ **Matchmaking Canceled**", 
                 embed = None, 
@@ -191,9 +208,6 @@ class TeammateSelection(BaseView):
             return await message.edit(content=f"❌ **Matchmaking Canceled by {interaction.user.mention}**", embed=None, view=None, delete_after=120)
         
         if result == player_two_task:
-            interaction.client.states.pop(interaction.user.id)
-            interaction.client.states.pop(other_user.id)
-            
             await player_two_cancel.interaction.response.edit_message(
                 content = f"❌ **Matchmaking Canceled**",
                 embed = None, 
@@ -211,21 +225,13 @@ class TeammateSelection(BaseView):
             
             canceled_by = matchup.canceled_by
             
-            if not interaction.is_expired():
-                try:
-                    await interaction.delete_original_response()
-                except discord.HTTPException:
-                    pass
+            await interaction.delete_original_response()
             
             if canceled_by.id == interaction.user.id:
                 return await message.edit(content=f"❌ **Matchmaking Canceled by {interaction.user.mention}**", embed=None, view=None, delete_after=120)
             else:
                 await message.edit(content=f"❌ **Matchmaking Canceled**", embed=None, view=None, delete_after=30)
-                
-                if interaction.is_expired():
-                    return await interaction.channel.send(content=f"❌ **{interaction.user.mention}, matchmaking was canceled by {other_user.mention}**")
-                else:
-                    return await interaction.followup.send(content=f"❌ **Matchmaking Canceled by {other_user.mention}**", ephemeral=True)
+                return await interaction.followup.send(content=f"❌ **Matchmaking Canceled by {other_user.mention}**", ephemeral=True)
         
         interaction.client.states[interaction.user.id] = "are already in a game"
         interaction.client.states[other_user.id] = "are already in a game"

@@ -24,12 +24,15 @@ class Queue:
     async def join_queue(self, team: Object[str, Any], loop: asyncio.AbstractEventLoop):
         if self.queue:
             for item in self.queue:
-                # skill base matchmaking
-                # make sure region is the same
-                # create match id 
+                # TODO:
+                # create match
+                #   create ID
+                #   store in database (in this func or /queue command)
+                # match matching
+                #   same region
+                #   skill based
                 
-                # store in database
-                #   whether that be in this func or the /queue command
+                # Example of simple skill based match making
                 
                 #if abs(item.team.trophies - team.trophies) > 100:
                 #   continue

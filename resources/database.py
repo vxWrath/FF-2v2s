@@ -47,7 +47,7 @@ class Database:
                     raise SystemError("Failed to connect to Redis.") from e
                 else:
                     errors += 1
-                    subprocess.run("wsl sudo -S sudo service redis-server start", input=f"{REDIS_PASSWORD}\n\n".encode(), shell=True)
+                    subprocess.run("wsl sudo -S sudo service redis-server start", input=f"{REDIS_PASSWORD}\n".encode())
 
             await asyncio.sleep(10)
            
