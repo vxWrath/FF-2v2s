@@ -1,5 +1,5 @@
 from os import environ as env
-from typing import Optional, List, Type
+from typing import Optional, List, Type, Any
 
 import asyncio
 import json
@@ -14,9 +14,12 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import DuplicateKeyError
 
 from .objects import BaseObject, Object, ObjectArray
-from .models import User
+from .models import User, Match
 
 MONGO_URL = env['MONGO_URL']
+
+REDIS_HOST = env['REDIS_HOST']
+REDIS_PORT = env['REDIS_PORT']
 REDIS_PASSWORD = env['REDIS_PASSWORD']
         
 class Database:
@@ -25,34 +28,24 @@ class Database:
         self.mongo.get_io_loop = asyncio.get_running_loop
         
         self.redis = Redis(
-            password = REDIS_PASSWORD,
             decode_responses = True,
             retry_on_timeout = True,
             health_check_interval = 30,
         )
         
     async def ping_loop(self):
-        errors = 0
         while True:
             try:
                 await asyncio.wait_for(self.redis.ping(), timeout=10)
             except RedisAuthenticationError as e:
-                self.redis = Redis(
-                    decode_responses = True,
-                    retry_on_timeout = True,
-                    health_check_interval = 30,
-                )
+                raise e
             except RedisConnectionError as e:
-                if errors > 0 or sys.platform != 'win32':
-                    raise SystemError("Failed to connect to Redis.") from e
-                else:
-                    errors += 1
-                    subprocess.run("wsl sudo -S sudo service redis-server start", input=f"{REDIS_PASSWORD}\n".encode())
+                raise e
 
             await asyncio.sleep(10)
            
-    async def create[T](self, domain: str, item_id: str, cls: Type[T]) -> T:
-        item = cls(**{"id": int(item_id)})
+    async def create[T](self, domain: str, item_id: str, cls: Type[T], **aspects) -> T:
+        item = cls(**{"id": int(item_id)} | aspects)
         
         try:
             await self.mongo.matchmaker[domain].insert_one({"_id": str(item_id)} | item.dump_without_id().to_mongo())
@@ -134,3 +127,10 @@ class Database:
             user = await self.create_user(user_id)
             
         return user
+    
+    async def create_match(self, match_id: int, region: int, team_one: Object[str, Any], team_two: Object[str, Any]):
+        return await self.create("matches", str(match_id), Match, **{
+            "region": region, 
+            "team_one": team_one,
+            "team_two": team_two
+        })

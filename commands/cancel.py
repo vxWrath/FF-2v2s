@@ -20,18 +20,18 @@ class Cancel(commands.Cog):
         extras = Object(defer_ephemerally=True, get_user_data=True)
     )
     async def cancel(self, interaction: discord.Interaction[MatchMaker]):
-        session = [
+        item = [
             x for x in interaction.client.queuer.queue 
-            if x.team.player_one.id == interaction.user.id
-            or x.team.player_two.id == interaction.user.id
+            if x.team.player_one == interaction.user.id
+            or x.team.player_two == interaction.user.id
         ]
         
-        if not session:
+        if not item:
             return await interaction.followup.send(content=f"❌ **You are not in the match making queue**", ephemeral=True)
         
-        session = session[0]
-        session.future.set_result(Object(canceled_by=interaction.user))
-        interaction.client.queuer.queue.remove(session)
+        item = item[0]
+        item.future.set_result(Object(canceled_by=interaction.user))
+        interaction.client.queuer.queue.remove(item)
         
         await interaction.followup.send(content=f"**Match making canceled**", ephemeral=True)
         

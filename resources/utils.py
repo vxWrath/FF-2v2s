@@ -14,16 +14,16 @@ class BaseView(discord.ui.View):
         self.extras      = extras or Object({})
         
     async def interaction_check(self, interaction: discord.Interaction[MatchMaker]) -> bool:
-        if interaction.channel.type == discord.ChannelType.private:
-            return True
-        
         if self.extras.custom_id_data and interaction.data['custom_id'].split(':')[0] in self.extras.custom_id_data.keys():
             interaction.extras['extras'] = self.extras.custom_id_data[interaction.data['custom_id'].split(':')[0]]
         else:
             interaction.extras['extras'] = self.extras
-        
+
         if not await interaction.client.tree.interaction_check(interaction):
             return False
+        
+        if interaction.channel.type == discord.ChannelType.private:
+            return True
         
         if hasattr(self, "check_func"):
             return await self.check_func(interaction)

@@ -10,8 +10,54 @@ import uuid
 
 from resources import MatchMaker, Object, User, RobloxUser, BaseView, BaseModal, Colors, Region
 
+FOOTBALL_FUSION_LINK = re.compile(
+    r"(?:https:\/\/www\.roblox\.com\/games\/8204899140\/football-fusion-2\?privateserverlinkcode=)([0-9]{25,})", 
+    flags=re.IGNORECASE
+)
+
+class PrivateServerOrSkip(BaseView):
+    def __init__(self, interaction: discord.Interaction[MatchMaker], data: Optional[User]=None, rblx: Optional[RobloxUser]=None):
+        super().__init__(120, interaction, extras=Object(custom_id_data={"skip": {"defer": True}}))
+
+        self.data  = data
+        self.rblx  = rblx
+        self.value = None
+
+    @ui.button(label="Provide URL", style=discord.ButtonStyle.blurple)
+    async def private_server(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+        modal = GetPrivateServerLink(interaction)
+        await interaction.response.send_modal(modal)
+
+        if await modal.wait():
+            self.stop()
+            return await self.on_timeout()
+        
+        interaction = modal.interaction
+
+        if self.data and self.rblx:
+            await interaction.edit_original_response(
+                content = "**Select your 2v2 teammate below (They must be in this server)**", 
+                view = TeammateSelection(interaction, self.data, self.rblx, modal.value)
+            )
+        else:
+            self.interaction = modal.interaction
+            self.value       = modal.value
+
+        self.stop()
+
+    @ui.button(label="Skip", style=discord.ButtonStyle.gray, custom_id=f"skip:{uuid.uuid4()}")
+    async def skip(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+        if self.data and self.rblx:
+            await interaction.edit_original_response(
+                content = "**Select your 2v2 teammate below (They must be in this server)**", 
+                view=TeammateSelection(interaction, self.data, self.rblx)
+            )
+
+        self.interaction = interaction
+        self.stop()
+
 class TeammateSelection(BaseView):
-    def __init__(self, interaction: discord.Interaction[MatchMaker], data: User, rblx: RobloxUser):
+    def __init__(self, interaction: discord.Interaction[MatchMaker], data: User, rblx: RobloxUser, vip_url: Optional[str]=None):
         super().__init__(120, interaction, Object(custom_id_data={
             "users": {"defer_ephemerally": True, "get_user_data": True},
             "cancel": {"defer": True},
@@ -19,6 +65,7 @@ class TeammateSelection(BaseView):
         
         self.data = data
         self.rblx = rblx
+        self.vip_url = vip_url
         
     @ui.select(cls=ui.UserSelect, placeholder="Users", custom_id=f"users:{uuid.uuid4()}")
     async def users(self, interaction: discord.Interaction[MatchMaker], _: discord.SelectOption):
@@ -95,6 +142,23 @@ class TeammateSelection(BaseView):
             return await interaction.edit_original_response(content=f"**{other_user.mention} has their DMs closed**")
         
         await invitation_view.wait()
+
+        other_vip_url = None
+        get_vip_view  = None
+        if invitation_view.result == "accepted" and not self.vip_url:
+            get_vip_view = PrivateServerOrSkip(interaction)
+
+            await invitation_view.interaction.response.edit_message(
+                content = (
+                    f"Invitation from {interaction.user.mention} (`{interaction.user.name}`) was **accepted**. "
+                    f"**If you have an active private server for FF2, please provide it below**"
+                ),
+                embed = None,
+                view = get_vip_view,
+            )
+        else:
+            await invitation_view.interaction.response.defer()
+
         await asyncio.sleep(1)
         
         if invitation_view.result == "denied":
@@ -108,12 +172,24 @@ class TeammateSelection(BaseView):
         
         interaction.client.states[interaction.user.id] = "are already finding a game"
         interaction.client.states[other_user.id] = "are already finding a game"
+
+        if get_vip_view:
+            await get_vip_view.wait()
+            other_vip_url = get_vip_view.value
         
-        # TODO
-        # fix private server url in /account
-        #   clear database
-        # Check if either person has a private server
-        #   check api if link is valid
+        # TODO:
+        # leaderboard commands
+        # add background commands to disable queue (admin only)
+        #   for scheduled downtime, etc
+        # add backgrounds to clear database queue & player states (dev only)
+        # finish settings
+        # stats
+        # /result <match id>
+        #   google vision API
+        # somehow figure out how to verify if the private server is active (mostly impossible)
+        
+        private_server_text = f"✅ ({interaction.user.mention}'s server)" if self.vip_url else None
+        private_server_text = f"✅ ({other_user.mention}'s server)" if not private_server_text and other_vip_url else private_server_text or '❌'
         
         trophies = int(round((self.data.trophies + other_data.trophies) / 2, 0))
         embed = discord.Embed(
@@ -122,12 +198,23 @@ class TeammateSelection(BaseView):
                 f"`Player One:` {interaction.user.mention}\n"
                 f"`Player Two:` {other_user.mention}\n"
                 f"`Trophies:` 🏆 **{trophies}**\n"
+                f"`Private Server:` {private_server_text}\n\n"
             ),
             color = Colors.white
         )
+
+        if not self.vip_url and not other_vip_url:
+            embed.set_footer(text="Since neither of you have a private server, it may take longer to find a game")
         
         view = FindGame(120, interaction)
         await interaction.edit_original_response(content=None, embed=embed, view=view)
+
+        embed.description += f"*Waiting for {interaction.user.mention}...*"
+
+        if get_vip_view:
+            await get_vip_view.interaction.edit_original_response(content=None, embed=embed, view=None)
+        elif invitation_view.interaction.response.is_done():
+            await invitation_view.interaction.followup.send(embed=embed)
         
         if await view.wait():
             interaction.client.states.pop(interaction.user.id)
@@ -139,8 +226,9 @@ class TeammateSelection(BaseView):
             )
             
         interaction = view.interaction
-        timeout     = datetime.timedelta(seconds=30)#datetime.timedelta(minutes=10)
+        timeout     = datetime.timedelta(minutes=10)
 
+        embed.description = "\n".join(embed.description.split("\n")[:4])
         embed.description += (
             "\n## <a:loading:1217310863623585832> Finding Game...\n"
             f"*You will be kicked out of the queue {discord.utils.format_dt(discord.utils.utcnow() + timeout, "R")}*"
@@ -173,7 +261,7 @@ class TeammateSelection(BaseView):
         player_one_task   = interaction.client.loop.create_task(player_one_cancel.wait())
         await interaction.response.edit_message(embed=embed, view=player_one_cancel)
 
-        team  = Object(player_one=interaction.user, player_two=other_user, region=other_data.settings.region, trophies=trophies)
+        team  = Object(player_one=interaction.user.id, player_two=other_user.id, region=other_data.settings.region, trophies=trophies, vip_url=self.vip_url or other_vip_url)
         queue = interaction.client.loop.create_task(interaction.client.queuer.join_queue(team, interaction.client.loop))
         
         done, pending = await asyncio.wait([player_one_task, player_two_task, queue, timeout_task], timeout=None, return_when=asyncio.FIRST_COMPLETED)
@@ -236,15 +324,26 @@ class TeammateSelection(BaseView):
         interaction.client.states[interaction.user.id] = "are already in a game"
         interaction.client.states[other_user.id] = "are already in a game"
         
+        team_one_players = Object(
+            player_one=interaction.client.get_user(matchup.team_one.player_one),
+            player_two=interaction.client.get_user(matchup.team_one.player_two),
+        )
+
+        team_two_players = Object(
+            player_one=interaction.client.get_user(matchup.team_two.player_one),
+            player_two=interaction.client.get_user(matchup.team_two.player_two),
+        )
+
         embed.description = (
             f"# 2v2 Found\n"
+            f":bangbang: `Match ID:` **{matchup.id}**\n"
             f"### Team One\n"
-            f"`Player One:` {matchup.team_one.player_one.mention} (`{matchup.team_one.player_one.id}`)\n"
-            f"`Player Two:` {matchup.team_one.player_two.mention} (`{matchup.team_one.player_two.id}`)\n"
+            f"`Player One:` {team_one_players.player_one.mention} (`{team_one_players.player_one.id}`)\n"
+            f"`Player Two:` {team_one_players.player_two.mention} (`{team_one_players.player_two.id}`)\n"
             f"`Trophies:` 🏆 **{matchup.team_one.trophies}**\n"
             f"### Team Two\n"
-            f"`Player One:` {matchup.team_two.player_one.mention} (`{matchup.team_two.player_one.id}`)\n"
-            f"`Player Two:` {matchup.team_two.player_two.mention} (`{matchup.team_two.player_two.id}`)\n"
+            f"`Player One:` {team_two_players.player_one.mention} (`{team_two_players.player_one.id}`)\n"
+            f"`Player Two:` {team_two_players.player_two.mention} (`{team_two_players.player_two.id}`)\n"
             f"`Trophies:` 🏆 **{matchup.team_two.trophies}**\n"
         )
         
@@ -259,7 +358,32 @@ class TeammateSelection(BaseView):
     async def cancel(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
         self.stop()
         await self.on_timeout()
+
+class GetPrivateServerLink(BaseModal):
+    link = ui.TextInput(
+        label = "Private Server URL (NOT REQUIRED)",
+        placeholder = f"Please paste your private server URL here",
+        min_length = 100,
+        required = False
+    )
+    
+    def __init__(self, interaction: discord.Interaction[MatchMaker]):
+        super().__init__("Private Server", 120, interaction, Object(defer_ephemerally=True))
         
+        self.value = None
+
+    async def on_submit(self, interaction: discord.Interaction[MatchMaker]):
+        value = self.link.value
+
+        if value:
+            if not FOOTBALL_FUSION_LINK.match(value):
+                return await interaction.followup.send(content = f"❌ **That was not a link to a FF2 private server**")
+
+            self.value = value
+
+        self.interaction = interaction
+        self.stop()
+
 class QueueInvitation(BaseView):
     def __init__(self, timeout: float, inviter: discord.Member):
         super().__init__(timeout)
@@ -290,11 +414,11 @@ class QueueInvitation(BaseView):
                 view = None,
             )
             
-        await interaction.response.edit_message(
-            content = f"Invitation from {self.inviter.mention} (`{self.inviter.name}`) was **accepted**. Now waiting for your team to enter the match making queue.",
-            embed = None,
-            view = None,
-        )
+        #await interaction.response.edit_message(
+        #    content = f"Invitation from {self.inviter.mention} (`{self.inviter.name}`) was **accepted**. Now waiting for your team to enter the match making queue.",
+        #    embed = None,
+        #    view = None,
+        #)
         
         self.interaction = interaction
         self.result = "accepted"
@@ -354,7 +478,10 @@ class Queue(commands.Cog):
         if interaction.client.states.get(interaction.user.id):
             return await interaction.followup.send(content=f"❌ **You can't queue up because you {interaction.client.states[interaction.user.id]}**")
         
-        await interaction.followup.send("**Select your 2v2 teammate below (They must be in this server)**", view=TeammateSelection(interaction, data, rblx))
+        await interaction.followup.send(
+            content = f"**If you have an active private server for FF2, please provide it below**",
+            view = PrivateServerOrSkip(interaction, data, rblx)
+        )
         
 async def setup(bot: MatchMaker):
     cog = Queue(bot)

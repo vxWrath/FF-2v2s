@@ -60,12 +60,12 @@ class Sync(commands.Cog):
                             self.bot.tree.copy_global_to(guild=guild)
                         app_commands = await self.bot.tree.sync(guild=guild)
                         
-                    for command in app_commands:
-                        if any([x.type == discord.AppCommandOptionType.subcommand for x in command.options]):
-                            for subcommand in command.options:
-                                self.bot.command_mentions[subcommand.qualified_name] = subcommand.mention
-                        else:
-                            self.bot.command_mentions[command.name] = command.mention
+                    #for command in app_commands:
+                    #    if any([x.type == discord.AppCommandOptionType.subcommand for x in command.options]):
+                    #        for subcommand in command.options:
+                    #            self.bot.command_mentions[subcommand.qualified_name] = subcommand.mention
+                    #    else:
+                    #        self.bot.command_mentions[command.name] = command.mention
                         
                 elif command == "unload":
                     await self.bot.unload_extensions()

@@ -35,8 +35,8 @@ class MatchMaker(commands.Bot):
         
         self.external_session: aiohttp.ClientSession = aiohttp.ClientSession()
         self.database: Database = Database()
-        self.queuer: Queue = Queue()
-        self.states: Dict[int, Any] = Object({})
+        self.queuer: Queue = Queue(self.database)
+        self.states: Dict[int, str] = Object({})
         
     async def setup_hook(self) -> None:
         self.loop.create_task(self.database.ping_loop())

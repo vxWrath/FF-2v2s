@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_serializer
 from typing import Dict, Optional, Any, List, TypedDict
 from enum import Enum
 from enum import property as enum_property
+import datetime
 
 from .objects import Object
 
@@ -16,6 +17,8 @@ class Region(Enum):
         return self._name_.replace('_', ' ')
     
 class Model(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
         dump = super().model_dump(*args, **kwargs)
         return Object(dump)
@@ -28,8 +31,6 @@ class Model(BaseModel):
         return item
 
 class User(Model):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    
     id: int
     roblox_id: Optional[int] = None
     blacklisted: Optional[bool] = False
@@ -43,7 +44,6 @@ class User(Model):
 
     settings: Optional[Object] = Field(default_factory=lambda: Object(
         region = 1, 
-        private_server_url = None,
         queue_requests = True, 
         queue_request_whitelist = [],
         queue_request_blacklist = [], 
@@ -57,4 +57,22 @@ class User(Model):
     
     @field_serializer("season")
     def season_to_dict(mapping: Object):
+        return mapping.convert()
+    
+class Match(Model):
+    id: int
+    created_at: datetime.datetime
+    region: int
+
+    thread_id: Optional[int] = None
+
+    team_one: Object[str, Any] 
+    team_two: Object[str, Any]
+
+    @field_serializer("team_one")
+    def team_one_to_dict(mapping: Object):
+        return mapping.convert()
+    
+    @field_serializer("team_two")
+    def team_two_to_dict(mapping: Object):
         return mapping.convert()
