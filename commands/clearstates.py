@@ -1,14 +1,9 @@
-import asyncio
 import discord
-import datetime
-import re
-from discord import app_commands, ui
-from discord.ext import commands
-from typing import Optional
-import random
-import uuid
 
-from resources import MatchMaker, Object
+from discord import app_commands
+from discord.ext import commands
+
+from resources import MatchMaker, Object, Extras
 
 class ClearStates(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -17,7 +12,7 @@ class ClearStates(commands.Cog):
     @app_commands.command(
         name="clearstates", 
         description="test command: clears player states within the queue/game system",
-        extras = Object(defer_ephemerally=True)
+        extras=Extras(defer_ephemerally=True),
     )
     async def fillqueue(self, interaction: discord.Interaction[MatchMaker]):
         interaction.client.states = Object({})

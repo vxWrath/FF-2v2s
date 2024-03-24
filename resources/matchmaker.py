@@ -92,14 +92,14 @@ class AppCommandTree(CommandTree[MatchMaker]):
         
         interaction.data   = Object(interaction.data)
         interaction.extras = Object(interaction.extras)
-        extras             = Object(interaction.command.extras if interaction.command else interaction.extras['extras'])
+        extras             = interaction.command.extras if interaction.command else interaction.extras['extras']
         
         if extras.defer:
             await interaction.response.defer(ephemeral=False, thinking=extras.thinking or False)
         elif extras.defer_ephemerally:
             await interaction.response.defer(ephemeral=True, thinking=extras.thinking or False)
             
-        if extras.get_user_data:
+        if extras.user_data:
             try:
                 async with asyncio.timeout(2):
                     interaction.extras.users = Object({

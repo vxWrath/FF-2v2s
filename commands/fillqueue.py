@@ -1,14 +1,10 @@
-import asyncio
 import discord
-import datetime
-import re
-from discord import app_commands, ui
-from discord.ext import commands
-from typing import Optional
 import random
-import uuid
 
-from resources import MatchMaker, Object, User, RobloxUser, BaseView, BaseModal, Colors, Region
+from discord import app_commands
+from discord.ext import commands
+
+from resources import MatchMaker, Object, Extras
 
 class FillQueue(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -17,7 +13,7 @@ class FillQueue(commands.Cog):
     @app_commands.command(
         name="fillqueue", 
         description="test command: add a team to the queue",
-        extras = Object(defer_ephemerally=True, get_user_data=True)
+        extras=Extras(defer_ephemerally=True, user_data=True),
     )
     async def fillqueue(self, interaction: discord.Interaction[MatchMaker]):
         player_one, player_two = tuple(random.choices([x for x in interaction.guild.members if x.id not in [450136921327271946, 1104883688279384156]], k=2))

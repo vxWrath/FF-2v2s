@@ -1,13 +1,12 @@
-import asyncio
 import discord
-import re
-from discord import app_commands, ui
-from discord.ext import commands
-from typing import Optional
 import random
+import re
 import uuid
 
-from resources import MatchMaker, Object, User, RobloxUser, BaseView, BaseModal, Colors, Region
+from discord import app_commands, ui
+from discord.ext import commands
+
+from resources import MatchMaker, Object, Extras, User, RobloxUser, BaseView, BaseModal, Colors, Region
 
 ROBLOX_NAME = re.compile(r"^(?=^\w{3,20}$)[a-z0-9]+_?[a-z0-9]+$", flags=re.IGNORECASE)
 
@@ -181,7 +180,7 @@ class ManageAccount(commands.Cog):
     @app_commands.command(
         name="account", 
         description="manage your settings & roblox account",
-        extras = Object(defer_ephemerally=True, get_user_data=True)
+        extras=Extras(defer_ephemerally=True, user_data=True),
     )
     async def account(self, interaction: discord.Interaction[MatchMaker]):
         data: User       = interaction.extras['users'][interaction.user.id]

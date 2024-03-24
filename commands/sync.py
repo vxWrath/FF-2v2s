@@ -1,11 +1,11 @@
-from typing import Literal, Optional
-
 import colorlog
 import discord
+
 from discord import app_commands
 from discord.ext import commands
+from typing import Literal, Optional
 
-from resources import MatchMaker, Object
+from resources import MatchMaker, Extras
 
 logger = colorlog.getLogger('bot')
 
@@ -20,7 +20,7 @@ class Sync(commands.Cog):
     @app_commands.command(
         name='extensions', 
         description='(un)load the cogs & (un)sync the commands', 
-        extras=Object(defer_ephemerally=True, get_user_data=False)
+        extras=Extras(defer_ephemerally=True, user_data=True),
     )
     @app_commands.describe(command="the command to execute", globally="whether to globally (un)sync the commands", guild="the guild to (un)sync")
     #@app_commands.check(owner_only)

@@ -4,18 +4,19 @@ import discord
 from colorthief import ColorThief
 from discord.ext.commands import Bot as MatchMaker
 
+from .models import Extras
 from .objects import Object
 
 class BaseView(discord.ui.View):
-    def __init__(self, timeout: int, interaction: Optional[discord.Interaction[MatchMaker]]=None, extras: Optional[Object]=None):
+    def __init__(self, timeout: int, interaction: Optional[discord.Interaction[MatchMaker]]=None, extras: Optional[Extras]=None):
         super().__init__(timeout=timeout)
         
         self.interaction = interaction
-        self.extras      = extras or Object({})
+        self.extras      = extras or Extras()
         
     async def interaction_check(self, interaction: discord.Interaction[MatchMaker]) -> bool:
-        if self.extras.custom_id_data and interaction.data['custom_id'].split(':')[0] in self.extras.custom_id_data.keys():
-            interaction.extras['extras'] = self.extras.custom_id_data[interaction.data['custom_id'].split(':')[0]]
+        if self.extras.custom_id and interaction.data['custom_id'].split(':')[0] in self.extras.custom_id.keys():
+            interaction.extras['extras'] = self.extras.custom_id[interaction.data['custom_id'].split(':')[0]]
         else:
             interaction.extras['extras'] = self.extras
 
@@ -52,19 +53,30 @@ class BaseView(discord.ui.View):
     async def on_error(self, interaction: discord.Interaction[MatchMaker], error: Exception, _: discord.ui.Item[Any]) -> None:
         return await interaction.client.tree.on_error(interaction, error)
     
+    async def cancel_view(self):
+        self.stop()
+
+        if not self.interaction:
+            return
+                
+        try:
+            await self.interaction.edit_original_response(content="❌ **Canceled**", view=None, embed=None)
+        except discord.HTTPException:
+            pass
+    
 class BaseModal(discord.ui.Modal):
-    def __init__(self, title: str, timeout: int, interaction: Optional[discord.Interaction[MatchMaker]]=None, extras: Optional[Object]=None):
+    def __init__(self, title: str, timeout: int, interaction: Optional[discord.Interaction[MatchMaker]]=None, extras: Optional[Extras]=None):
         super().__init__(title=title, timeout=timeout)
         
         self.interaction = interaction
-        self.extras      = extras or Object({})
+        self.extras      = extras or Extras()
         
     async def interaction_check(self, interaction: discord.Interaction[MatchMaker]) -> bool:
-        if interaction.channel.type == discord.ChannelType.private:
-            return True
-        
         interaction.extras['extras'] = self.extras
-        return await interaction.client.tree.interaction_check(interaction)
+        
+        if not await interaction.client.tree.interaction_check(interaction):
+            return False
+        return True
         
     async def on_timeout(self) -> None:
         if not self.interaction:

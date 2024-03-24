@@ -1,14 +1,10 @@
 import asyncio
 import discord
-import datetime
-import re
-from discord import app_commands, ui
-from discord.ext import commands
-from typing import Optional
-import random
-import uuid
 
-from resources import MatchMaker, Object, User, RobloxUser, BaseView, BaseModal, Colors, Region
+from discord import app_commands
+from discord.ext import commands
+
+from resources import MatchMaker, Extras
 
 class ClearDM(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -17,7 +13,7 @@ class ClearDM(commands.Cog):
     @app_commands.command(
         name="cleardm", 
         description="test command: clears DMs with the bot",
-        extras = Object(defer_ephemerally=True)
+        extras=Extras(defer_ephemerally=True),
     )
     async def fillqueue(self, interaction: discord.Interaction[MatchMaker]):
         channel = interaction.user.dm_channel or await interaction.user.create_dm()

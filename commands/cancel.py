@@ -1,14 +1,9 @@
-import asyncio
 import discord
-import datetime
-import re
-from discord import app_commands, ui
-from discord.ext import commands
-from typing import Optional
-import random
-import uuid
 
-from resources import MatchMaker, Object, User, RobloxUser, BaseView, BaseModal, Colors, Region
+from discord import app_commands
+from discord.ext import commands
+
+from resources import MatchMaker, Object, Extras
 
 class Cancel(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -17,7 +12,7 @@ class Cancel(commands.Cog):
     @app_commands.command(
         name="cancel", 
         description="cancel match making",
-        extras = Object(defer_ephemerally=True, get_user_data=True)
+        extras=Extras(defer_ephemerally=True, user_data=True),
     )
     async def cancel(self, interaction: discord.Interaction[MatchMaker]):
         item = [

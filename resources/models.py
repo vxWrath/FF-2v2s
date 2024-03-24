@@ -7,6 +7,20 @@ import datetime
 
 from .objects import Object
 
+class Extras:
+    def __init__(self, 
+        defer: Optional[bool]=None, 
+        defer_ephemerally: Optional[bool]=None,
+        thinking: Optional[bool]=None,
+        user_data: Optional[bool]=None,
+        custom_id: Optional[Object] = None,
+    ) -> None:
+        self.defer = defer
+        self.defer_ephemerally = defer_ephemerally
+        self.thinking = thinking
+        self.user_data = user_data
+        self.custom_id = custom_id
+
 class Region(Enum):
     US_East = 1
     US_West = 2
