@@ -108,7 +108,9 @@ class VerifyRobloxAccount(BaseView):
         
 class CompleteVerification(BaseView):
     def __init__(self, interaction: discord.Interaction[MatchMaker], view, verifying: bool, rblx: RobloxUser, avatar_url: str, words: str):
-        super().__init__(120, interaction, Object(custom_id_data={"done": {"defer_ephemerally": True, "get_user_data": True}}))
+        super().__init__(120, interaction, extras=Extras(custom_id=Object(
+            done = Extras(defer_ephemerally=True, user_data=True)
+        )))
         
         self.verifying  = verifying
         self.view       = view

@@ -1,4 +1,5 @@
 from .database import Database
+from .constants import *
 from .matchmaker import MatchMaker
 from .models import Extras, Region, User
 from .objects import BaseObject, Object, ObjectArray

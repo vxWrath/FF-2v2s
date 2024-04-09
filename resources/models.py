@@ -50,8 +50,6 @@ class User(Model):
     blacklisted: Optional[bool] = False
     
     trophies: Optional[int] = 0
-    wins: Optional[int] = 0
-    losses: Optional[int] = 0
     
     inactive_for: Optional[int] = 0
     bonus: Optional[int] = 0
@@ -78,7 +76,7 @@ class Match(Model):
     created_at: datetime.datetime
     region: int
 
-    thread_id: Optional[int] = None
+    thread: Optional[int] = None
 
     team_one: Object[str, Any] 
     team_two: Object[str, Any]

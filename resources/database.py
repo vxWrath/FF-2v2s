@@ -17,10 +17,6 @@ from .objects import BaseObject, Object, ObjectArray
 from .models import User, Match
 
 MONGO_URL = env['MONGO_URL']
-
-REDIS_HOST = env['REDIS_HOST']
-REDIS_PORT = env['REDIS_PORT']
-REDIS_PASSWORD = env['REDIS_PASSWORD']
         
 class Database:
     def __init__(self):
@@ -128,9 +124,11 @@ class Database:
             
         return user
     
-    async def create_match(self, match_id: int, region: int, team_one: Object[str, Any], team_two: Object[str, Any]):
+    async def create_match(self, match_id: int, created_at: datetime.datetime, region: int, thread: int, team_one: Object[str, Any], team_two: Object[str, Any]):
         return await self.create("matches", str(match_id), Match, **{
             "region": region, 
+            "created_at": created_at,
+            "thread": thread,
             "team_one": team_one,
             "team_two": team_two
         })

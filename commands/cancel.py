@@ -28,7 +28,7 @@ class Cancel(commands.Cog):
         item.future.set_result(Object(canceled_by=interaction.user))
         interaction.client.queuer.queue.remove(item)
         
-        await interaction.followup.send(content=f"**Match making canceled**", ephemeral=True)
+        await interaction.followup.send(content=f"❌ **Matchmaking canceled**", ephemeral=True)
         
 async def setup(bot: MatchMaker):
     cog = Cancel(bot)
