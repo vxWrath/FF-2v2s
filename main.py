@@ -29,6 +29,7 @@ async def main():
     
     try:
         async with bot:
+            await asyncio.wait_for(bot.database.redis.ping(), timeout=10)
             await bot.start(token)
     except asyncio.CancelledError:
         pass

@@ -342,8 +342,8 @@ class SelectTeammate(BaseView):
                 embed.set_author(name=other_user.name, icon_url=other_user.display_avatar.url)
                 return await interaction.followup.send(embed=embed, ephemeral=True)
             
-        interaction.client.states[interaction.user.id] = Object(last_updated=discord.utils.utcnow(), message="are already in a game")
-        interaction.client.states[other_user.id] = Object(last_updated=discord.utils.utcnow(), message="are already in a game")
+        interaction.client.states[interaction.user.id] = Object(last_updated=discord.utils.utcnow(), message="are already in a game", type="in-game")
+        interaction.client.states[other_user.id] = Object(last_updated=discord.utils.utcnow(), message="are already in a game", type="in-game")
         
         thread = parent.get_thread(matchup.thread)
         
@@ -403,8 +403,8 @@ class Invite(BaseView):
 
         self.result = "accepted"
 
-        interaction.client.states[interaction.user.id] = Object(last_updated=discord.utils.utcnow(), message="are already finding a game")
-        interaction.client.states[self.inviter.id] = Object(last_updated=discord.utils.utcnow(), message="are already finding a game")
+        interaction.client.states[interaction.user.id] = Object(last_updated=discord.utils.utcnow(), message="are already finding a game", type="finding")
+        interaction.client.states[self.inviter.id] = Object(last_updated=discord.utils.utcnow(), message="are already finding a game", type="finding")
 
         if not self.private_server:
             embed = discord.Embed(

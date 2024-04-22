@@ -77,9 +77,12 @@ class Match(Model):
     region: int
 
     thread: Optional[int] = None
+    score_message: Optional[int] = None
 
-    team_one: Object[str, Any] 
+    team_one: Object[str, Any]
     team_two: Object[str, Any]
+    
+    scores: Object[str, List[int]]
 
     @field_serializer("team_one")
     def team_one_to_dict(mapping: Object):
@@ -87,4 +90,8 @@ class Match(Model):
     
     @field_serializer("team_two")
     def team_two_to_dict(mapping: Object):
+        return mapping.convert()
+    
+    @field_serializer("scores")
+    def scores_to_dict(mapping: Object):
         return mapping.convert()

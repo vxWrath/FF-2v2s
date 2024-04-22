@@ -28,15 +28,19 @@ class Queue:
                 # TODO:
                 # match matching
                 #   skill based
+                #   progressive (trophy/match search widens every nth second)
+                #   prohibit recent matches
+                #       recent dates (maybe within 12-24 hours, possibly longer) and recent opponents
                 
                 self.queue.remove(item)
                 
                 match_id = self._create_id()
                 thread   = await channel.create_thread(
-                    name=f"{match_id}", 
-                    message=None,
-                    type=discord.ChannelType.private_thread,
-                    invitable=False,
+                    name = f"2v2: {match_id}", 
+                    message = None,
+                    type = discord.ChannelType.private_thread,
+                    invitable = False,
+                    auto_archive_duration = 1440
                 )
                 
                 embed = discord.Embed(
@@ -65,17 +69,21 @@ class Queue:
                     await message.reply(content=(
                         f"`Team One's Private Server:` **{item.team.private_server}**\n"
                         f"`Team Two's Private Server:` **{team.private_server}**"
-                    ))
+                    ), suppress_embeds=True)
                 elif team.private_server:
                     await message.reply(content=(
                         f"`Team Two's Private Server:` **{team.private_server}**"
-                    ))
+                    ), suppress_embeds=True)
                 elif item.team.private_server:
                     await message.reply(content=(
                         f"`Team One's Private Server:` **{item.team.private_server}**\n"
-                    ))
+                    ), suppress_embeds=True)
                     
-                match  = await self.database.create_match(match_id, discord.utils.utcnow(), item.team.region, thread.id, item.team, team)
+                await message.reply(content=(
+                    f":bangbang: `Match ID:` **{match_id}**"
+                ), suppress_embeds=True)
+                    
+                match  = await self.database.create_match(match_id, discord.utils.utcnow(), item.team.region, thread.id, item.team, team, Object({}), None)
                 future = item.future.set_result(match)
                 
                 return match
@@ -100,3 +108,6 @@ class Queue:
 
         random.shuffle(special)
         return int(base + ''.join(special))
+    
+async def setup(_):
+    pass

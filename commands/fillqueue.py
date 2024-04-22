@@ -17,14 +17,15 @@ class FillQueue(commands.Cog):
     )
     async def fillqueue(self, interaction: discord.Interaction[MatchMaker]):
         player_one = interaction.guild.get_member(486232733698359296)
-        player_two = interaction.guild.get_member(486232733698359296)
+        player_two = interaction.guild.get_member(925841573172891658)
         
         team    = Object(
             player_one=player_one.id, 
             player_two=player_two.id, 
             region=1, 
             trophies=0, 
-            private_server=f"https://www.roblox.com/games/8204899140/Football-Fusion-2?privateServerLinkCode=73943576065693662579174688833743"
+            private_server=f"https://www.roblox.com/games/8204899140/Football-Fusion-2?privateServerLinkCode=73943576065693662579174688833743",
+            score=0
         )
         
         parent  = interaction.client.get_channel(THREAD_CHANNEL)

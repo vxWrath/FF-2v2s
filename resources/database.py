@@ -33,12 +33,10 @@ class Database:
         while True:
             try:
                 await asyncio.wait_for(self.redis.ping(), timeout=10)
-            except RedisAuthenticationError as e:
-                raise e
             except RedisConnectionError as e:
                 raise e
 
-            await asyncio.sleep(10)
+            await asyncio.sleep(30)
            
     async def create[T](self, domain: str, item_id: str, cls: Type[T], **aspects) -> T:
         item = cls(**{"id": int(item_id)} | aspects)
@@ -124,11 +122,22 @@ class Database:
             
         return user
     
-    async def create_match(self, match_id: int, created_at: datetime.datetime, region: int, thread: int, team_one: Object[str, Any], team_two: Object[str, Any]):
+    async def create_match(self, match_id: int, created_at: datetime.datetime, region: int, thread: int, team_one: Object[str, Any], team_two: Object[str, Any], scores: Object[str, List[int]], score_message: Optional[int]):
         return await self.create("matches", str(match_id), Match, **{
             "region": region, 
             "created_at": created_at,
             "thread": thread,
             "team_one": team_one,
-            "team_two": team_two
+            "team_two": team_two,
+            "scores": scores,
+            "score_message": score_message,
         })
+        
+    async def get_match_by_thread(self, thread_id: int):
+        item = Object.from_mongo((await self.mongo.matchmaker["matches"].find_one({"thread": str(thread_id)}) or {}))
+        
+        if not item:
+            return
+        
+        item["id"] = item.pop("_id")
+        return Match(**item)
