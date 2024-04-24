@@ -25,7 +25,7 @@ class FillQueue(commands.Cog):
             region=1, 
             trophies=0, 
             private_server=f"https://www.roblox.com/games/8204899140/Football-Fusion-2?privateServerLinkCode=73943576065693662579174688833743",
-            score=0
+            score=None
         )
         
         parent  = interaction.client.get_channel(THREAD_CHANNEL)

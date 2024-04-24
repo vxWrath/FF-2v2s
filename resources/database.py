@@ -133,6 +133,24 @@ class Database:
             "score_message": score_message,
         })
         
+    async def update_match(self, match: Match, update_keys: Optional[List[str]]=None) -> None:
+        items = match.dump_without_id()
+        
+        if update_keys:
+            return await self.update(
+                "matches",
+                str(match.id),
+                True,
+                **{k: v for k, v in items.items() if k in update_keys}
+            )
+            
+        return await self.update(
+            "matches",
+            str(match.id),
+            True
+            **items
+        )
+        
     async def get_match_by_thread(self, thread_id: int):
         item = Object.from_mongo((await self.mongo.matchmaker["matches"].find_one({"thread": str(thread_id)}) or {}))
         

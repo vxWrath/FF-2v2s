@@ -269,7 +269,7 @@ class SelectTeammate(BaseView):
             region=other_data.settings.region, 
             trophies=trophies, 
             private_server=self.private_server or invite.private_server,
-            score=0
+            score=None
         )
         match_making_task = interaction.client.loop.create_task(interaction.client.queuer.join_queue(team, interaction.client.loop, parent))
         

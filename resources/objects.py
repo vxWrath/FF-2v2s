@@ -105,7 +105,9 @@ class Object(BaseObject, dict):
     def from_mongo(cls: Self, mapping: dict) -> Self:
         for key, val in mapping.items():
             if isinstance(val, dict):
-                mapping[key] = cls.from_mongo(val)
+                mapping[key] = Object.from_mongo(val)
+            elif isinstance(val, list):
+                mapping[key] = ObjectArray.from_mongo(val)
             elif isinstance(val, str):
                 if val.isdigit():
                     mapping[key] = int(val)
@@ -131,7 +133,7 @@ class Object(BaseObject, dict):
                 try:
                     mapping[key] = json.loads(val)
                 except json.JSONDecodeError:
-                    mapping[key] = val
+                    pass
                         
         return cls(mapping)
         
@@ -158,11 +160,11 @@ class Object(BaseObject, dict):
             if isinstance(val, datetime.datetime):
                 mapping[key] = val.isoformat()
             elif isinstance(key, BaseObject):
-                mapping[key] = json.dumps(val.to_redis())
+                mapping[key] = val.to_redis()
             else:
-                mapping[key] = json.dumps(val)
-                
-        return mapping
+                mapping[key] = val
+        
+        return {x: json.dumps(y) for x, y in mapping.items()}
         
     def convert(self) -> dict:
         return {
@@ -186,7 +188,11 @@ class ObjectArray(BaseObject, list):
     @classmethod
     def from_mongo(cls: Self, array: list) -> Self:
         for i in range(len(array)):
-            if isinstance(array[i], str):
+            if isinstance(array[i], dict):
+                array[i] = Object.from_mongo(array[i])
+            elif isinstance(array[i], list):
+                array[i] = ObjectArray.from_mongo(array[i])
+            elif isinstance(array[i], str):
                 if array[i].isdigit():
                     array[i] = int(array[i])
                 elif array[i].replace('.', '').isdigit():
@@ -204,28 +210,34 @@ class ObjectArray(BaseObject, list):
         for i in range(len(array)):
             if isinstance(array[i], str):
                 try:
-                    array[i] = datetime.datetime.fromisoformat(i)
+                    array[i] = datetime.datetime.fromisoformat(array[i])
                 except ValueError:
                     pass
                 
                 try:
-                    array[i] = json.loads(i)
+                    array[i] = json.loads(array[i])
+                    
+                    if isinstance(array[i], str):
+                        if array[i].isdigit():
+                            array[i] = int(array[i])
+                        elif array[i].replace('.', '').isdigit():
+                            array[i] = float(array[i])
                 except json.JSONDecodeError:
                     pass
-                        
+                
         return cls(array)
     
     def to_mongo(self) -> list:
         array = []
         for i in range(len(self)):
             if isinstance(self[i], (int, float)):
-                array[i] = str(self[i])
+                array.append(str(self[i]))
             elif isinstance(self[i], datetime.datetime):
-                array[i] = self[i].isoformat()
+                array.append(self[i].isoformat())
             elif isinstance(self[i], BaseObject):
-                array[i] = self[i].to_mongo()
+                array.append(self[i].to_mongo())
             else:
-                array[i] = self[i]
+                array.append(self[i])
                 
         return array
     
@@ -236,11 +248,13 @@ class ObjectArray(BaseObject, list):
                 continue
             
             if isinstance(self[i], datetime.datetime):
-                array[i] = self[i].isoformat()
+                array.append(self[i].isoformat())
             elif isinstance(self[i], BaseObject):
-                array[i] = json.dumps(self[i].to_redis())
+                array.append(self[i].to_redis())
             else:
-                array[i] = json.dumps(self[i])
+                array.append(self[i])
+                
+        return [json.dumps(x) for x in array]
         
     def convert(self) -> list: 
         return [

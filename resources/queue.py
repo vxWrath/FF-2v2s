@@ -59,7 +59,7 @@ class Queue:
                 )
                 
                 message = await thread.send(
-                    content=f"<@{item.team.player_one}> <@{item.team.player_two}> <@{team.player_one}> <@{team.player_two}>", 
+                    #content=f"<@{item.team.player_one}> <@{item.team.player_two}> <@{team.player_one}> <@{team.player_two}>", 
                     embed=embed,
                 )
                 

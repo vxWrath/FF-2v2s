@@ -137,7 +137,7 @@ class CompleteVerification(BaseView):
         await interaction.edit_original_response(embed=embed, view=None)
         
         data.roblox_id = rblx.id
-        await interaction.client.database.update_user(data, "roblox_id")
+        await interaction.client.database.update_user(data, ["roblox_id"])
         
         self.stop()
         
