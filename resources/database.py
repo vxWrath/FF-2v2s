@@ -151,7 +151,11 @@ class Database:
             **items
         )
         
-    async def get_match_by_thread(self, thread_id: int):
+    async def delete_match(self, match: Match) -> None:
+        await self.mongo.matchmaker["matches"].delete_one({"_id": str(match.id)})
+        await self.redis.delete(f"matches:{match.id}")
+        
+    async def get_match_by_thread(self, thread_id: int) -> Optional[Match]:
         item = Object.from_mongo((await self.mongo.matchmaker["matches"].find_one({"thread": str(thread_id)}) or {}))
         
         if not item:
@@ -159,3 +163,19 @@ class Database:
         
         item["id"] = item.pop("_id")
         return Match(**item)
+    
+    async def get_users_matches(self, user_id: int) -> Optional[List[Match]]:
+        query = {
+            "$or": [
+                {"team_one.player_one": str(user_id)},
+                {"team_one.player_two": str(user_id)},
+                {"team_two.player_one": str(user_id)},
+                {"team_two.player_two": str(user_id)}
+            ]
+        }
+        
+        return [Match(**_change_id(Object.from_mongo(x))) async for x in self.mongo.matchmaker["matches"].find(query)]
+    
+def _change_id(item: Object) -> Object:
+    item["id"] = item.pop("_id")
+    return item

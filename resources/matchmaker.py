@@ -13,6 +13,7 @@ from discord.ext import commands
 intents = discord.Intents.none()
 intents.guilds  = True
 intents.members = True
+intents.message_content = True
 
 member_cache_flags = discord.MemberCacheFlags().none()
 member_cache_flags.joined = True

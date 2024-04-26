@@ -41,6 +41,14 @@ class Result(commands.Cog):
         if matchup.team_one.score is not None or matchup.team_two.score is not None:
             return await interaction.followup.send(content=f"❌ **The result of this matchup has already been set**")
         
+        if not interaction.user.id in [
+            self.matchup.team_one.player_one, 
+            self.matchup.team_one.player_two, 
+            self.matchup.team_two.player_one, 
+            self.matchup.team_two.player_two,
+        ]:
+            return await interaction.followup.send(content=f"❌ **You do not have permission to set the result of this matchup**")
+        
         yours    = matchup.team_one if interaction.user.id in [matchup.team_one.player_one, matchup.team_one.player_two] else matchup.team_two
         opponent = matchup.team_two if yours == matchup.team_one else matchup.team_one
         
@@ -72,16 +80,39 @@ class Result(commands.Cog):
             description = f"## Matchup Scores\n",
             color = Colors.blank
         )
-        embed.set_author(name="For a score to be confirmed, it must have >50% agreement")
-        embed.set_footer(text=f"ID: {matchup.id}")
+        embed.set_author(name="For a score to be confirmed, it must have 3/4 agreement")
+        embed.set_footer(text=f"Type /result to vote - ID: {matchup.id}")
         
-        for score, voters in dict(sorted(matchup.scores.items(), key=lambda x : len(x[1]))).items():
+        for score, voters in dict(sorted(matchup.scores.items(), key=lambda x : len(x[1]), reverse=True)).items():
             team_one_score, team_two_score = tuple(score.split('-'))
+            
+            if len(voters) >= 3:
+                await interaction.followup.send(
+                    content = f"**Result set. Deleting {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=10), "R")}**",
+                    view = None
+                )
+            
+                matchup.team_one.score = int(team_one_score)
+                matchup.team_two.score = int(team_two_score)
+                
+                interaction.client.states.pop(self.matchup.team_one.player_one, None)
+                interaction.client.states.pop(self.matchup.team_one.player_two, None)
+                interaction.client.states.pop(self.matchup.team_two.player_one, None)
+                interaction.client.states.pop(self.matchup.team_two.player_two, None)
+                
+                await asyncio.sleep(10)
+                await interaction.channel.delete()
+                
+                matchup.thread = None
+                matchup.score_message = None
+                matchup.scores = Object()
+                
+                return await interaction.client.database.update_match(matchup, ["team_one", "team_two", "thread", "scores", "score_message"])
             
             embed.description += f"`{team_one_score:>2}` **- <@{matchup.team_one.player_one}> & <@{matchup.team_one.player_two}>**\n"
             embed.description += f"`{team_two_score:>2}` **- <@{matchup.team_two.player_one}> & <@{matchup.team_two.player_two}>**\n"
             
-            embed.description += f"*- Voters (`{(len(voters) / 4) * 100:.0f}%`): " + ", ".join([f"<@{x}>" for x in voters]) + "*\n\n"
+            embed.description += f"*- Voters (`{(len(voters) / 3) * 100:.0f}%`): " + ", ".join([f"<@{x}>" for x in voters]) + "*\n\n"
         
         message = await interaction.followup.send(embed=embed)
         

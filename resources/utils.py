@@ -1,10 +1,13 @@
 from typing import Any, Optional
 
+import datetime
 import discord
+import io
 from colorthief import ColorThief
 from discord.ext.commands import Bot as MatchMaker
 
-from .models import Extras
+from .constants import THREAD_LOG
+from .models import Extras, Match
 from .objects import Object
 
 class BaseView(discord.ui.View):
@@ -113,6 +116,32 @@ class Colors:
             return discord.Color.from_rgb(*rgb)
         except Exception:
             return Colors.blank
+        
+async def send_thread_log(matchup: Match, thread: discord.Thread):
+    thread_log = thread.guild.get_channel(THREAD_LOG)
+    
+    previous_author = None
+    messages = f"THREAD ID - {thread.id} | MATCH ID: {matchup.id}\n\n"
+    
+    async for message in thread.history(limit=250, oldest_first=True):
+        if message.author.bot:
+            if previous_author == message.author:
+                messages += f"-- BOT MESSAGE --\n"
+            else:
+                messages += f"\n-- BOT MESSAGE --\n"
+            
+            previous_author = message.author
+            continue
+        
+        if previous_author == message.author:
+            messages += f"{discord.utils.escape_mentions(message.clean_content)}\n"
+        else:
+            messages += f"\n{message.author.name} ({message.author.id}) @ {message.created_at.strftime('%m/%d/%Y %r')}\n{message.clean_content}\n"
+            
+        previous_author = message.author
+    
+    f = discord.File(io.StringIO(messages.strip()), filename="messages.txt")
+    await thread_log.send(file=f)
         
 async def setup(bot: MatchMaker):
     pass
