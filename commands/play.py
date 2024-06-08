@@ -26,7 +26,7 @@ class LinkOrSkip(BaseView):
             self.value = None
 
     @ui.button(label="Provide Link", style=discord.ButtonStyle.blurple)
-    async def provide(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def provide(self, interaction: discord.Interaction[MatchMaker], _):
         modal = GetLink(interaction)
         await interaction.response.send_modal(modal)
 
@@ -56,7 +56,7 @@ class LinkOrSkip(BaseView):
         self.stop()
 
     @ui.button(label="Skip & Continue", style=discord.ButtonStyle.gray, custom_id=f"skip:{uuid.uuid4()}")
-    async def skip(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def skip(self, interaction: discord.Interaction[MatchMaker], _):
         if self.player == "one":
             embed = discord.Embed(
                 description = f"**Select your 2v2 teammate below (They must be in this server)**",
@@ -96,7 +96,7 @@ class GetLink(BaseModal):
         self.stop()
 
 class SelectTeammate(BaseView):
-    def __init__(self, interaction: discord.Interaction, data: User, rblx: RobloxUser, private_server: str):
+    def __init__(self, interaction: discord.Interaction[MatchMaker], data: User, rblx: RobloxUser, private_server: str):
         super().__init__(240, interaction, Extras(custom_id=Object(
             users = Extras(defer=True, user_data=True),
             cancel = Extras(defer=True)
@@ -107,7 +107,7 @@ class SelectTeammate(BaseView):
         self.private_server = private_server
 
     @ui.select(cls=ui.UserSelect, placeholder="Users", custom_id=f"users:{uuid.uuid4()}")
-    async def users(self, interaction: discord.Interaction[MatchMaker], _: discord.SelectOption):
+    async def users(self, interaction: discord.Interaction[MatchMaker], _):
         other_user = self.users.values[0]
         
         if other_user.bot:
@@ -129,8 +129,8 @@ class SelectTeammate(BaseView):
             return await interaction.followup.send(content=f"⚠️ **{other_user.mention} is not verified**", ephemeral=True)
         
         if (
-            interaction.user.id in other_data.settings.queue_request_blacklist
-            or (not other_data.settings.queue_requests and interaction.user.id not in other_data.settings.queue_request_whitelist)
+            interaction.user.id in other_data.settings.party_request_blacklist
+            or (not other_data.settings.party_requests and interaction.user.id not in other_data.settings.party_request_whitelist)
         ):
             return await interaction.followup.send(content=f"❌ **You are not allowed to party up with {other_user.mention}**", ephemeral=True)
         
@@ -138,7 +138,7 @@ class SelectTeammate(BaseView):
             return await interaction.followup.send(
                 content = (
                     f"❌ **You can't party up with {other_user.mention} because you guys are not in the same match making region "
-                    f"(`{Region(self.data.region).name}`)**"
+                    f"(`{Region(self.data.settings.region).name}`)**"
                 ),
                 ephemeral=True
             )
@@ -163,7 +163,7 @@ class SelectTeammate(BaseView):
             f"You have received a party invite to play 2v2s with {interaction.user.mention}. "
             f"This party invite will expire **{discord.utils.format_dt(discord.utils.utcnow() + timeout, "R")}**\n"
         )
-        embed.set_footer(text="If you want to disable queue requests from this user, run /account")
+        embed.set_footer(text="If you want to disable party requests from this user, run /account")
         
         try:
             invite = Invite(timeout=timeout.total_seconds(), inviter=interaction.user, private_server=self.private_server)
@@ -360,11 +360,11 @@ class SelectTeammate(BaseView):
         await message.edit(embed=embed, view=None)
 
     @ui.button(label="Queue Solo", style=discord.ButtonStyle.blurple, disabled=True)
-    async def solo(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def solo(self, interaction: discord.Interaction[MatchMaker], _):
         await interaction.edit_original_response(content="...", view=None)
     
     @ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id=f"cancel:{uuid.uuid4()}")
-    async def cancel(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def cancel(self, interaction: discord.Interaction[MatchMaker], _):
         await self.cancel_view()
 
 class Invite(BaseView):
@@ -378,7 +378,7 @@ class Invite(BaseView):
         self.private_server = private_server
 
     @ui.button(label="Accept", style=discord.ButtonStyle.green)
-    async def accept(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def accept(self, interaction: discord.Interaction[MatchMaker], _):
         if interaction.client.states.get(interaction.user.id):
             embed = discord.Embed(
                 description = f"❌ **You can't party up because you {interaction.client.states[interaction.user.id].message}. Deleting this message {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=30), "R")}**",
@@ -426,7 +426,7 @@ class Invite(BaseView):
         self.stop()
 
     @ui.button(label="Decline", style=discord.ButtonStyle.red)
-    async def deny(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def deny(self, interaction: discord.Interaction[MatchMaker], _):
         embed = discord.Embed(
             description = f"**You have declined the party invite from {self.inviter.mention}. Deleting this message {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=30), "R")}**",
             color = Colors.blank
@@ -440,7 +440,7 @@ class Invite(BaseView):
     async def on_timeout(self) -> None:
         if self.message:
             embed = discord.Embed(
-                description = f"**The party invite from {self.inviter.mention} has expired. Deleting this message {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(120), "R")}**",
+                description = f"**The party invite from {self.inviter.mention} has expired. Deleting this message {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=120), "R")}**",
                 color = Colors.blank
             )
             embed.set_author(name=self.inviter.name, icon_url=self.inviter.display_avatar.url)
@@ -452,26 +452,26 @@ class Invite(BaseView):
 
 class FindGameButton(BaseView):
     @ui.button(label="Find Game", style=discord.ButtonStyle.blurple)
-    async def find_game(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def find_game(self, interaction: discord.Interaction[MatchMaker], _):
         self.interaction = interaction
         self.stop()
         
 class CancelMatchmakingButton(BaseView):
     @ui.button(label="Cancel Matchmaking", style=discord.ButtonStyle.red)
-    async def cancel(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def cancel(self, interaction: discord.Interaction[MatchMaker], _):
         self.interaction = interaction
         self.stop()
 
-class FindGame(commands.Cog):
+class Play(commands.Cog):
     def __init__(self, bot: MatchMaker):
         self.bot: MatchMaker = bot
         
     @app_commands.command(
-        name="findgame", 
-        description="find a 2v2 matchup",
+        name="play", 
+        description="find and play a 2v2 matchup",
         extras = Extras(defer_ephemerally=True, user_data=True)
     )
-    async def findgame(self, interaction: discord.Interaction[MatchMaker]):
+    async def play(self, interaction: discord.Interaction[MatchMaker]):
         data = interaction.extras['users'][interaction.user.id]
         rblx = await self.bot.roblox_client.get_user(data.roblox_id)
         
@@ -493,7 +493,7 @@ class FindGame(commands.Cog):
         )
         
 async def setup(bot: MatchMaker):
-    cog = FindGame(bot)
+    cog = Play(bot)
     
     for command in cog.walk_app_commands():
         if hasattr(command, "callback"):

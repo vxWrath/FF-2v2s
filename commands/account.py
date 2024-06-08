@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 import random
 import re
@@ -5,8 +7,9 @@ import uuid
 
 from discord import app_commands, ui
 from discord.ext import commands
+from typing import Literal
 
-from resources import MatchMaker, Object, Extras, User, RobloxUser, BaseView, BaseModal, Colors, Region
+from resources import MatchMaker, Object, Extras, User, RobloxUser, BaseView, BaseModal, Colors, Region, NoRobloxUser, DeleteMessageView
 
 ROBLOX_NAME = re.compile(r"^(?=^\w{3,20}$)[a-z0-9]+_?[a-z0-9]+$", flags=re.IGNORECASE)
 
@@ -14,7 +17,7 @@ word_bank = ['alice-blue', 'amaranth', 'amber', 'amethyst', 'apple-green', 'appl
 
 class Unverified(BaseView):
     @ui.button(label="Verify With Roblox", style=discord.ButtonStyle.gray)
-    async def verify(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def verify(self, interaction: discord.Interaction[MatchMaker], _):
         await interaction.response.send_modal(GetRobloxUsername(interaction, self, True))
     
 class GetRobloxUsername(BaseModal):
@@ -74,7 +77,7 @@ class VerifyRobloxAccount(BaseView):
         self.avatar_url = avatar_url
         
     @ui.button(label="Yes, Continue", style=discord.ButtonStyle.green)
-    async def yes(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def yes(self, interaction: discord.Interaction[MatchMaker], _):
         self.stop()
         words = ' '.join(random.choices(word_bank, k=10))
         
@@ -98,7 +101,7 @@ class VerifyRobloxAccount(BaseView):
         await interaction.response.edit_message(embed=embed, view=CompleteVerification(interaction, view, self.verifying, self.rblx, self.avatar_url, words))
     
     @ui.button(label="No, Restart", style=discord.ButtonStyle.red)
-    async def no(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def no(self, interaction: discord.Interaction[MatchMaker], _):
         if self.verifying:
             self.view.stop()
         else:
@@ -119,10 +122,13 @@ class CompleteVerification(BaseView):
         self.words      = words
         
     @ui.button(label="Done", style=discord.ButtonStyle.green, custom_id=f"done:{uuid.uuid4()}")
-    async def done(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def done(self, interaction: discord.Interaction[MatchMaker], _):
         message = await interaction.followup.send(content=f"🔎 *Getting info...*", ephemeral=True, wait=True)
         rblx    = await interaction.client.roblox_client.get_user(self.rblx.id)
         data    = interaction.extras['users'][interaction.user.id]
+
+        if not rblx:
+            raise NoRobloxUser(interaction.user)
         
         if self.words.lower() not in rblx.description.lower():
             return await message.edit(content="❌ **I couldn't find those words in your description**")
@@ -137,7 +143,7 @@ class CompleteVerification(BaseView):
         await interaction.edit_original_response(embed=embed, view=None)
         
         data.roblox_id = rblx.id
-        await interaction.client.database.update_user(data, ["roblox_id"])
+        await interaction.client.database.update_user(data)
         
         self.stop()
         
@@ -146,14 +152,17 @@ class CompleteVerification(BaseView):
         else:
             content = (
                 f"## Account Settings\n"
-                f"`Match Making Region:` **{Region(data.region).name}**\n"
                 f"`Roblox Account:` **{rblx.name}** ({rblx.id})\n"
+                f"`Match Making Region:` **{Region(data.settings.region).name}**\n\n"
+                f"`Party Requests:` {'✅' if data.settings.party_requests else '❌'}\n"
+                f"`Party Request Whitelist:` **{len(data.settings.party_request_whitelist)} members**\n"
+                f"`Party Request Blacklist:` **{len(data.settings.party_request_blacklist)} members**\n"
             )
             
             await self.view.interaction.edit_original_response(content=content)
     
     @ui.button(label="Stop, Restart", style=discord.ButtonStyle.red)
-    async def restart(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def restart(self, interaction: discord.Interaction[MatchMaker], _):
         if self.verifying:
             self.view.stop()
         else:
@@ -161,19 +170,147 @@ class CompleteVerification(BaseView):
         
         await interaction.response.send_modal(GetRobloxUsername(interaction, self.view, self.verifying))
 
+class SelectRegion(BaseView):
+    def __init__(self, interaction: discord.Interaction[MatchMaker], view, rblx: RobloxUser):
+        super().__init__(120, interaction, extras=Extras(defer_ephemerally=True, user_data=True))
+
+        self.view = view
+        self.rblx = rblx
+
+        for region in Region.__members__.values():
+            self.regions.add_option(label=region.name, value=str(region.value))
+
+    @ui.select(cls=ui.Select, placeholder="Regions", options=[])
+    async def regions(self, interaction: discord.Interaction[MatchMaker], _):
+        await interaction.edit_original_response(content="✅ **Region Updated**", view=None)
+        
+        data: User = interaction.extras['users'][interaction.user.id]
+        data.settings.region = int(self.regions.values[0])
+        await interaction.client.database.update_user(data)
+        
+        self.stop()
+        
+        content = (
+            f"## Account Settings\n"
+            f"`Roblox Account:` **{self.rblx.name}** ({self.rblx.id})\n"
+            f"`Match Making Region:` **{Region(data.settings.region).name}**\n\n"
+            f"`Party Requests:` {'✅' if data.settings.party_requests else '❌'}\n"
+            f"`Party Request Whitelist:` **{len(data.settings.party_request_whitelist)} members**\n"
+            f"`Party Request Blacklist:` **{len(data.settings.party_request_blacklist)} members**\n"
+        )
+        
+        await self.view.interaction.edit_original_response(content=content)
+
+class FlipQueueRequestStatus(BaseView):
+    def __init__(self, interaction: discord.Interaction[MatchMaker], view: ChangeAccountSettings, rblx: RobloxUser):
+        super().__init__(120, interaction, extras=Extras(defer_ephemerally=True, user_data=True))
+
+        self.view = view
+        self.rblx = rblx
+
+        data: User = view.interaction.extras['users'][interaction.user.id]
+
+        if data.settings.party_requests:
+            self.content = f"Do you want to turn party requests **off**?"
+            self.onoff.style = discord.ButtonStyle.red
+        else:
+            self.content = f"Do you want to turn party requests **on**?"
+            self.onoff.style = discord.ButtonStyle.green
+
+    @ui.button(label="Yes")
+    async def onoff(self, interaction: discord.Interaction[MatchMaker], _):
+        data: User = interaction.extras['users'][interaction.user.id]
+
+        if data.settings.party_requests:
+            await interaction.edit_original_response(content="✅ Party requests turned **off**", view=None)
+        else:
+            await interaction.edit_original_response(content="✅ Party requests turned **on**", view=None)
+        
+        data.settings.party_requests = not data.settings.party_requests
+        await interaction.client.database.update_user(data)
+        
+        self.stop()
+        
+        content = (
+            f"## Account Settings\n"
+            f"`Roblox Account:` **{self.rblx.name}** ({self.rblx.id})\n"
+            f"`Match Making Region:` **{Region(data.settings.region).name}**\n\n"
+            f"`Party Requests:` {'✅' if data.settings.party_requests else '❌'}\n"
+            f"`Party Request Whitelist:` **{len(data.settings.party_request_whitelist)} members**\n"
+            f"`Party Request Blacklist:` **{len(data.settings.party_request_blacklist)} members**\n"
+        )
+        
+        self.view.interaction.extras['users'][interaction.user.id] = data
+        await self.view.interaction.edit_original_response(content=content)
+
+class PartyRequestList(BaseView):
+    def __init__(self, interaction: discord.Interaction[MatchMaker], view: ChangeAccountSettings, rblx: RobloxUser, list_type: Literal['whitelist', 'blacklist']):
+        super().__init__(300, interaction, extras=Extras(defer_ephemerally=True, user_data=True))
+
+        self.view = view
+        self.rblx = rblx
+        self.list_type = list_type
+        
+        self.members.max_values = min(interaction.guild.member_count, 25)
+        self.members.default_values = [
+            discord.SelectDefaultValue(id=member_id, type=discord.SelectDefaultValueType.user) 
+            for member_id in view.interaction.extras['users'][interaction.user.id].settings[f'party_request_{list_type}']
+        ]
+
+    def format_embed(self) -> discord.Embed:
+        embed = discord.Embed(
+            title = f"{self.list_type.title()}ed Members",
+            color = Colors.blank,
+            timestamp = discord.utils.utcnow()
+        )
+
+        if self.list_type == "whitelist":
+            embed.description = f"If you have party requests off, this will allow the following users to still send party requests to you.\n\n"
+        else:
+            embed.description = f"If you have party requests on, this will prohibit the following users from sending you party requests.\n\n"
+
+        for dv in self.members.default_values:
+            embed.description += f"<@{dv.id}>\n"
+
+        return embed
+
+    @ui.select(cls=ui.UserSelect, placeholder="Members", min_values=0)
+    async def members(self, interaction: discord.Interaction[MatchMaker], _):
+        data: User = interaction.extras['users'][interaction.user.id]
+
+        self.members.default_values = [discord.SelectDefaultValue.from_user(user) for user in self.members.values]
+        data.settings[f'party_request_{self.list_type}'] = [x.id for x in self.members.values]
+
+        await interaction.edit_original_response(embed=self.format_embed(), view=self)
+        await interaction.client.database.update_user(data)
+
 class ChangeAccountSettings(BaseView):
+    def __init__(self, interaction: discord.Interaction[MatchMaker], rblx: RobloxUser):
+        super().__init__(300, interaction)
+
+        self.rblx = rblx
+
     @ui.select(cls=ui.Select, placeholder="Change Settings", options=[
         discord.SelectOption(label="Change roblox account", value="roblox"),
         discord.SelectOption(label="Change region", value="region"),
-        discord.SelectOption(label="Change queue request status", value="queue"),
-        discord.SelectOption(label="View/Edit queue request whitelist", value="whitelist"),
-        discord.SelectOption(label="View/Edit queue request blacklist", value="blacklist"),
+        discord.SelectOption(label="Change party request status", value="party_requests"),
+        discord.SelectOption(label="View/Edit party request whitelist", value="whitelist"),
+        discord.SelectOption(label="View/Edit party request blacklist", value="blacklist"),
     ])
-    async def change_settings(self, interaction: discord.Interaction[MatchMaker], _: discord.SelectMenu):
-        if self.change_settings.values[0] == "roblox":
+    async def change_settings(self, interaction: discord.Interaction[MatchMaker], _):
+        value = self.change_settings.values[0]
+        if value == "roblox":
             return await interaction.response.send_modal(GetRobloxUsername(interaction, self, False))
-        
-        await interaction.response.send_message(content="*Not Done*", ephemeral=True)
+        elif value == "region":
+            return await interaction.response.send_message(content="**Select a new match making region below**", view=SelectRegion(interaction, self, self.rblx), ephemeral=True)
+        elif value == "party_requests":
+            view = FlipQueueRequestStatus(interaction, self, self.rblx)
+            return await interaction.response.send_message(content=view.content, view=view, ephemeral=True)
+        elif value == "whitelist" or value == "blacklist":
+            self.stop()
+
+            view = PartyRequestList(interaction, self, self.rblx, value)
+            return await interaction.response.edit_message(content=None, embed=view.format_embed(), view=view)
 
 class ManageAccount(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -182,11 +319,11 @@ class ManageAccount(commands.Cog):
     @app_commands.command(
         name="account", 
         description="manage your settings & roblox account",
-        extras=Extras(defer_ephemerally=True, user_data=True),
+        extras=Extras(defer_ephemerally=True, user_data=True), # type: ignore
     )
     async def account(self, interaction: discord.Interaction[MatchMaker]):
-        data: User       = interaction.extras['users'][interaction.user.id]
-        rblx: RobloxUser = await self.bot.roblox_client.get_user(data.roblox_id)
+        data = interaction.extras['users'][interaction.user.id]
+        rblx = await self.bot.roblox_client.get_user(data.roblox_id)
         
         if not rblx:
             return await interaction.followup.send(
@@ -198,12 +335,12 @@ class ManageAccount(commands.Cog):
             f"## Account Settings\n"
             f"`Roblox Account:` **{rblx.name}** ({rblx.id})\n"
             f"`Match Making Region:` **{Region(data.settings.region).name}**\n\n"
-            f"`Queue Requests:` {'✅' if data.settings.queue_requests else '❌'}\n"
-            f"`Queue Request Whitelist:` **{len(data.settings.queue_request_whitelist)} members**\n"
-            f"`Queue Request Blacklist:` **{len(data.settings.queue_request_blacklist)} members**\n"
+            f"`Party Requests:` {'✅' if data.settings.party_requests else '❌'}\n"
+            f"`Party Request Whitelist:` **{len(data.settings.party_request_whitelist)} members**\n"
+            f"`Party Request Blacklist:` **{len(data.settings.party_request_blacklist)} members**\n"
         )
             
-        await interaction.followup.send(content=content, view=ChangeAccountSettings(300, interaction), suppress_embeds=True)
+        await interaction.followup.send(content=content, view=ChangeAccountSettings(interaction, rblx))
         
 async def setup(bot: MatchMaker):
     cog = ManageAccount(bot)

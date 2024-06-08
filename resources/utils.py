@@ -1,14 +1,13 @@
 from typing import Any, Optional
 
-import datetime
 import discord
 import io
 from colorthief import ColorThief
 from discord.ext.commands import Bot as MatchMaker
+from discord import ui
 
 from .constants import THREAD_LOG
 from .models import Extras, Match
-from .objects import Object
 
 class BaseView(discord.ui.View):
     def __init__(self, timeout: int, interaction: Optional[discord.Interaction[MatchMaker]]=None, extras: Optional[Extras]=None):
@@ -95,7 +94,25 @@ class BaseModal(discord.ui.Modal):
         
     async def on_error(self, interaction: discord.Interaction, error: Exception):
         await interaction.client.tree.on_error(interaction, error)
-        
+
+class DeleteMessageView(BaseView):
+    def __init__(self, interaction: discord.Interaction[MatchMaker], timeout: float):
+        super().__init__(timeout, interaction, extras=Extras(defer=True))
+
+    @ui.button(label="Delete Message", emoji="🗑", style=discord.ButtonStyle.gray)
+    async def delete(self, interaction: discord.Interaction[MatchMaker], _):
+        self.stop()
+        await interaction.delete_original_response()
+
+    async def on_timeout(self) -> None:
+        if not self.interaction:
+            return
+
+        try:
+            await self.interaction.delete_original_response()
+        except discord.HTTPException:
+            pass
+
 class Colors:
     white   = discord.Color.from_str("#FFFFFF")
     blue    = discord.Color.from_str("#5896ff")
@@ -117,6 +134,10 @@ class Colors:
         except Exception:
             return Colors.blank
         
+    @staticmethod
+    def ensure_color(color: discord.Color) -> discord.Color:
+        return color if color.value else Colors.blank
+
 async def send_thread_log(matchup: Match, thread: discord.Thread):
     thread_log = thread.guild.get_channel(THREAD_LOG)
     
@@ -131,13 +152,12 @@ async def send_thread_log(matchup: Match, thread: discord.Thread):
                 messages += f"\n-- BOT MESSAGE --\n"
             
             previous_author = message.author
-            continue
-        
-        if previous_author == message.author:
-            messages += f"{discord.utils.escape_mentions(message.clean_content)}\n"
         else:
-            messages += f"\n{message.author.name} ({message.author.id}) @ {message.created_at.strftime('%m/%d/%Y %r')}\n{message.clean_content}\n"
-            
+            if previous_author == message.author:
+                messages += f"{discord.utils.escape_mentions(message.clean_content)}\n"
+            else:
+                messages += f"\n{message.author.name} ({message.author.id}) @ {message.created_at.strftime('%m/%d/%Y %r')}\n{message.clean_content}\n"
+                
         previous_author = message.author
     
     f = discord.File(io.StringIO(messages.strip()), filename="messages.txt")

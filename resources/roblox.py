@@ -1,6 +1,5 @@
 import aiohttp
 import datetime
-from discord.utils import cached_property
 
 from typing import Optional, Dict, Any, List
 
@@ -34,15 +33,15 @@ class RobloxClient:
     def __init__(self, session: aiohttp.ClientSession):
         self.session = session
 
-    async def request(self, method: str, subdomain: str, path: str = "", params: Dict[str, Any]=None, request_json: Dict[str, Any]=None) -> str:
+    async def request(self, method: str, subdomain: str, path: str = "", params: Optional[Dict[str, Any]]=None, request_json: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
         async with self.session.request(method, f"https://{subdomain}.roblox.com/{path}", params=params, json=request_json) as response:
             return await response.json()
         
-    async def get_users(self, user_ids: List[int]):
+    async def get_users(self, user_ids: List[int]) -> List[RobloxUser]:
         response = await self.request("post", "users", f"v1/users", request_json={"userIds": user_ids, "excludeBannedUsers": True})
         
         if response.get('data') is None or len(response['data']) == 0:
-            return
+            return []
         return [RobloxUser(**x) for x in response['data']]
 
     async def get_user(self, user_id: int) -> Optional[RobloxUser]:

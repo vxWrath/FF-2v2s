@@ -2,14 +2,27 @@ import asyncio
 import datetime
 import discord
 import collections
+import numpy
 
-from discord import app_commands, ui
+from discord import app_commands
 from discord.ext import commands
 
 from resources import MatchMaker, Extras, Colors, THREAD_CHANNEL, Object
 
 def is_thread(interaction: discord.Interaction) -> bool:
     return interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent.id == THREAD_CHANNEL
+
+def trophy_change(your_team, opponent_team) -> int:
+    base_change = 37.5
+    is_win      = your_team.score > opponent_team.score
+
+    trophy_factor = (opponent_team.trophies - your_team.trophies) / 100
+    score_factor  = (your_team.score - opponent_team.score) / 5
+
+    if is_win:
+        return int(numpy.clip(base_change + trophy_factor * 10 + score_factor, 25, 50))
+    else:
+        return int(numpy.clip(-base_change + trophy_factor * 10 + score_factor, -50, -25))
 
 class Result(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -42,10 +55,10 @@ class Result(commands.Cog):
             return await interaction.followup.send(content=f"❌ **The result of this matchup has already been set**")
         
         if not interaction.user.id in [
-            self.matchup.team_one.player_one, 
-            self.matchup.team_one.player_two, 
-            self.matchup.team_two.player_one, 
-            self.matchup.team_two.player_two,
+            matchup.team_one.player_one, 
+            matchup.team_one.player_two, 
+            matchup.team_two.player_one, 
+            matchup.team_two.player_two,
         ]:
             return await interaction.followup.send(content=f"❌ **You do not have permission to set the result of this matchup**")
         
@@ -86,19 +99,18 @@ class Result(commands.Cog):
         for score, voters in dict(sorted(matchup.scores.items(), key=lambda x : len(x[1]), reverse=True)).items():
             team_one_score, team_two_score = tuple(score.split('-'))
             
-            if len(voters) >= 3:
+            if len(voters) >= 2:
                 await interaction.followup.send(
                     content = f"**Result set. Deleting {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=10), "R")}**",
-                    view = None
                 )
             
                 matchup.team_one.score = int(team_one_score)
                 matchup.team_two.score = int(team_two_score)
                 
-                interaction.client.states.pop(self.matchup.team_one.player_one, None)
-                interaction.client.states.pop(self.matchup.team_one.player_two, None)
-                interaction.client.states.pop(self.matchup.team_two.player_one, None)
-                interaction.client.states.pop(self.matchup.team_two.player_two, None)
+                interaction.client.states.pop(matchup.team_one.player_one, None)
+                interaction.client.states.pop(matchup.team_one.player_two, None)
+                interaction.client.states.pop(matchup.team_two.player_one, None)
+                interaction.client.states.pop(matchup.team_two.player_two, None)
                 
                 await asyncio.sleep(10)
                 await interaction.channel.delete()
@@ -106,8 +118,23 @@ class Result(commands.Cog):
                 matchup.thread = None
                 matchup.score_message = None
                 matchup.scores = Object()
+
+                team_one_change = trophy_change(matchup.team_one, matchup.team_two)
+                team_two_change = trophy_change(matchup.team_two, matchup.team_one)
+
+                for player in [matchup.team_one.player_one, matchup.team_one.player_two]:
+                    user = await interaction.client.database.produce_user(player)
+                    user.trophies = max(user.trophies + team_one_change, 0)
+
+                    await interaction.client.database.update_user(user)
+
+                for player in [matchup.team_two.player_one, matchup.team_two.player_two]:
+                    user = await interaction.client.database.produce_user(player)
+                    user.trophies = max(user.trophies + team_two_change, 0)
+
+                    await interaction.client.database.update_user(user)
                 
-                return await interaction.client.database.update_match(matchup, ["team_one", "team_two", "thread", "scores", "score_message"])
+                return await interaction.client.database.update_match(matchup)
             
             embed.description += f"`{team_one_score:>2}` **- <@{matchup.team_one.player_one}> & <@{matchup.team_one.player_two}>**\n"
             embed.description += f"`{team_two_score:>2}` **- <@{matchup.team_two.player_one}> & <@{matchup.team_two.player_two}>**\n"
@@ -117,7 +144,7 @@ class Result(commands.Cog):
         message = await interaction.followup.send(embed=embed)
         
         matchup.score_message = message.id
-        await interaction.client.database.update_match(matchup, ["scores", "score_message"])
+        await interaction.client.database.update_match(matchup)
         
 async def setup(bot: MatchMaker):
     cog = Result(bot)

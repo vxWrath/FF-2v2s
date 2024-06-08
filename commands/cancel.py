@@ -5,7 +5,7 @@ import discord
 from discord import app_commands, ui
 from discord.ext import commands
 
-from resources import MatchMaker, Object, Extras, THREAD_CHANNEL, BaseView, Match
+from resources import MatchMaker, Object, Extras, THREAD_CHANNEL, BaseView, Match, DeleteMessageView
 
 class CancelGame(BaseView):
     def __init__(self, interaction: discord.Interaction[MatchMaker], matchup: Match):
@@ -15,11 +15,14 @@ class CancelGame(BaseView):
         self.cancelers = [interaction.user.id]
         
     @ui.button(label="Cancel Game (33%)", style=discord.ButtonStyle.red)
-    async def cancel_game(self, interaction: discord.Interaction[MatchMaker], _: discord.Button):
+    async def cancel_game(self, interaction: discord.Interaction[MatchMaker], _):
         if interaction.user.id in self.cancelers:
             self.cancelers.remove(interaction.user.id)
         else:
             self.cancelers.append(interaction.user.id)
+
+        if not interaction.channel or isinstance(interaction.channel, (discord.DMChannel, discord.GroupChannel)):
+            return
             
         if len(self.cancelers) == 0:
             await interaction.response.defer()
@@ -59,36 +62,36 @@ class Cancel(commands.Cog):
     @app_commands.command(
         name="cancel", 
         description="cancel match making",
-        extras=Extras(defer=True, user_data=True),
+        extras=Extras(defer=True, user_data=True), # type: ignore
     )
     async def cancel(self, interaction: discord.Interaction[MatchMaker]):
         data = interaction.extras['users'][interaction.user.id]
         rblx = await self.bot.roblox_client.get_user(data.roblox_id)
         
         if not rblx:
-            return await interaction.followup.send(content=f"⚠️ **You are not verified. Run /account to verify**")
+            return await interaction.followup.send(content=f"⚠️ **You are not verified. Run /account to verify**", view=DeleteMessageView(interaction, 60))
         
-        if interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent.id == THREAD_CHANNEL:
+        if interaction.channel and interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent and interaction.channel.parent.id == THREAD_CHANNEL:
             matchup = await interaction.client.database.get_match_by_thread(interaction.channel.id)
             
             if not matchup:
                 return await interaction.followup.send(content=f"❌ **I couldn't find the matchup within this thread**")
             
             if matchup.team_one.score is not None or matchup.team_two.score is not None:
-                return await interaction.followup.send(content=f"❌ **You can't cancel a game that's already finished**")
+                return await interaction.followup.send(content=f"❌ **You can't cancel a game that's already finished**", view=DeleteMessageView(interaction, 60))
             
             return await interaction.followup.send(content=f"**Voters:** {interaction.user.mention}", view=CancelGame(interaction, matchup))
         
-        item = [
+        items = [
             x for x in interaction.client.queuer.queue 
             if x.team.player_one == interaction.user.id
             or x.team.player_two == interaction.user.id
         ]
         
-        if not item:
-            return await interaction.followup.send(content=f"❌ **You are not in the match making queue**", ephemeral=True)
+        if not items:
+            return await interaction.followup.send(content=f"❌ **You are not in the match making queue**", view=DeleteMessageView(interaction, 60))
         
-        item = item[0]
+        item = items[0]
         item.future.set_result(Object(canceled_by=interaction.user))
         interaction.client.queuer.queue.remove(item)
         

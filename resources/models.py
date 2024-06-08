@@ -1,9 +1,9 @@
-from typing_extensions import Literal
+import datetime
+
 from pydantic import BaseModel, Field, ConfigDict, field_serializer
-from typing import Dict, Optional, Any, List, TypedDict
+from typing import Dict, Optional, Any, List
 from enum import Enum
 from enum import property as enum_property
-import datetime
 
 from .objects import Object
 
@@ -33,7 +33,7 @@ class Region(Enum):
 class Model(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
+    def model_dump(self, *args, **kwargs) -> Object:
         dump = super().model_dump(*args, **kwargs)
         return Object(dump)
     
@@ -47,28 +47,28 @@ class Model(BaseModel):
 class User(Model):
     id: int
     roblox_id: Optional[int] = None
-    blacklisted: Optional[bool] = False
+    blacklisted: bool = False
     
-    trophies: Optional[int] = 0
+    trophies: int = 0
     
-    inactive_for: Optional[int] = 0
-    bonus: Optional[int] = 0
+    inactive_for: int = 0
+    bonus: int = 0
 
-    settings: Optional[Object] = Field(default_factory=lambda: Object(
+    settings: Object = Field(default_factory=lambda: Object(
         region = 1, 
-        queue_requests = True, 
-        queue_request_whitelist = [],
-        queue_request_blacklist = [], 
+        party_requests = True, 
+        party_request_whitelist = [],
+        party_request_blacklist = [], 
     ))
     
-    season: Optional[Object] = Field(default_factory=lambda: Object({}))
+    season: Object = Field(default_factory=lambda: Object({}))
     
     @field_serializer("settings")
-    def settings_to_dict(mapping: Object):
+    def settings_to_dict(mapping: Any) -> dict:
         return mapping.convert()
     
     @field_serializer("season")
-    def season_to_dict(mapping: Object):
+    def season_to_dict(mapping: Any) -> dict:
         return mapping.convert()
     
 class Match(Model):
@@ -79,19 +79,19 @@ class Match(Model):
     thread: Optional[int] = None
     score_message: Optional[int] = None
 
-    team_one: Object[str, Any]
-    team_two: Object[str, Any]
+    team_one: Object
+    team_two: Object
     
-    scores: Object[str, List[int]]
+    scores: Object
 
     @field_serializer("team_one")
-    def team_one_to_dict(mapping: Object):
+    def team_one_to_dict(mapping: Any) -> dict:
         return mapping.convert()
     
     @field_serializer("team_two")
-    def team_two_to_dict(mapping: Object):
+    def team_two_to_dict(mapping: Any) -> dict:
         return mapping.convert()
     
     @field_serializer("scores")
-    def scores_to_dict(mapping: Object):
+    def scores_to_dict(mapping: Any) -> dict:
         return mapping.convert()

@@ -2,18 +2,14 @@ from os import environ as env
 from typing import Optional, List, Type, Any
 
 import asyncio
-import json
 import datetime
-import subprocess
-import sys
 
 from redis.asyncio import Redis
 from redis import ConnectionError as RedisConnectionError
-from redis import AuthenticationError as RedisAuthenticationError
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import DuplicateKeyError
 
-from .objects import BaseObject, Object, ObjectArray
+from .objects import Object
 from .models import User, Match
 
 MONGO_URL = env['MONGO_URL']
@@ -96,21 +92,13 @@ class Database:
     async def get_user(self, user_id: int) -> Optional[User]:
         return await self.get("users", str(user_id), User, True)
     
-    async def update_user(self, user: User, update_keys: Optional[List[str]]=None) -> None:
+    async def update_user(self, user: User) -> None:
         items = user.dump_without_id()
-        
-        if update_keys:
-            return await self.update(
-                "users",
-                str(user.id),
-                True,
-                **{k: v for k, v in items.items() if k in update_keys}
-            )
             
         return await self.update(
             "users",
             str(user.id),
-            True
+            True,
             **items
         )
         
@@ -133,21 +121,13 @@ class Database:
             "score_message": score_message,
         })
         
-    async def update_match(self, match: Match, update_keys: Optional[List[str]]=None) -> None:
+    async def update_match(self, match: Match) -> None:
         items = match.dump_without_id()
         
-        if update_keys:
-            return await self.update(
-                "matches",
-                str(match.id),
-                True,
-                **{k: v for k, v in items.items() if k in update_keys}
-            )
-            
         return await self.update(
             "matches",
             str(match.id),
-            True
+            True,
             **items
         )
         
@@ -164,7 +144,7 @@ class Database:
         item["id"] = item.pop("_id")
         return Match(**item)
     
-    async def get_users_matches(self, user_id: int) -> Optional[List[Match]]:
+    async def get_user_matches(self, user_id: int) -> Optional[List[Match]]:
         query = {
             "$or": [
                 {"team_one.player_one": str(user_id)},

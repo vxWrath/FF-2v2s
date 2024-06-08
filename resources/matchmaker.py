@@ -5,8 +5,7 @@ import sys
 import colorlog
 
 import discord
-from os import environ as env
-from typing import Dict, Any
+from typing import Dict
 from discord.app_commands import Command, CommandTree, errors
 from discord.ext import commands
 
@@ -37,7 +36,7 @@ class MatchMaker(commands.Bot):
         self.external_session: aiohttp.ClientSession = aiohttp.ClientSession()
         self.database: Database = Database()
         self.queuer: Queue = Queue(self.database)
-        self.states: Dict[int, str] = Object({})
+        self.states: Object = Object({})
         
     async def setup_hook(self) -> None:
         self.loop.create_task(self.database.ping_loop())

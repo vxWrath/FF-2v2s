@@ -1,7 +1,7 @@
 import datetime
 import json
 
-from typing import Dict, Any, Self, Optional
+from typing import Any, Self, Optional
 
 class BaseObject:
     @classmethod

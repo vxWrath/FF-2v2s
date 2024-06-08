@@ -16,14 +16,14 @@ class Queue:
         self.queue     = []
         self.increment = 1
 
-    async def join_queue(self, team: Object[str, Any], loop: asyncio.AbstractEventLoop, channel: discord.TextChannel) -> Union[Object, Match]:
+    async def join_queue(self, team: Object, loop: asyncio.AbstractEventLoop, channel: discord.TextChannel) -> Union[Object, Match]:
         if self.queue:
             for item in self.queue:
                 if item.team.region != team.region:
                     continue
 
-                #if not item.team.private_server and not team.private_server:
-                #    continue
+                if not item.team.private_server and not team.private_server:
+                    continue
 
                 # TODO:
                 # match matching
