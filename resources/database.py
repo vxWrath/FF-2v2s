@@ -134,6 +134,16 @@ class Database:
     async def delete_match(self, match: Match) -> None:
         await self.mongo.matchmaker["matches"].delete_one({"_id": str(match.id)})
         await self.redis.delete(f"matches:{match.id}")
+
+    async def get_unfinished_matches(self) -> List[Match]:
+        query = {
+            "$and": [
+                {"team_one.score": None},
+                {"team_two.score": None},
+            ],
+        }
+        
+        return [Match(**_change_id(Object.from_mongo(x))) async for x in self.mongo.matchmaker["matches"].find(query)]
         
     async def get_match_by_thread(self, thread_id: int) -> Optional[Match]:
         item = Object.from_mongo((await self.mongo.matchmaker["matches"].find_one({"thread": str(thread_id)}) or {}))

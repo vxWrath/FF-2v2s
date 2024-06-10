@@ -13,7 +13,7 @@ class ClearDM(commands.Cog):
     @app_commands.command(
         name="cleardm", 
         description="test command: clears DMs with the bot",
-        extras=Extras(defer_ephemerally=True), # type: ignore
+        extras=Extras(defer_ephemerally=True), # 
     )
     async def fillqueue(self, interaction: discord.Interaction[MatchMaker]):
         channel = interaction.user.dm_channel or await interaction.user.create_dm()

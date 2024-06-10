@@ -7,7 +7,7 @@ import uuid
 from discord import app_commands, ui
 from discord.ext import commands
 
-from resources import MatchMaker, Object, Extras, User, Region, RobloxUser, BaseView, BaseModal, Colors, THREAD_CHANNEL
+from resources import MatchMaker, Object, Extras, User, Region, RobloxUser, BaseView, BaseModal, Colors, get_config
 
 FOOTBALL_FUSION_LINK  = "https://www.roblox.com/games/8204899140/Football-Fusion-2#!/game-instances"
 FOOTBALL_FUSION_REGEX = re.compile(r"(?:https:\/\/www\.roblox\.com\/games\/8204899140\/football-fusion-2\?privateserverlinkcode=)([0-9]{25,})", flags=re.IGNORECASE)
@@ -262,7 +262,8 @@ class SelectTeammate(BaseView):
         embed.set_author(name=other_user.name, icon_url=other_user.display_avatar.url)
         await interaction.edit_original_response(embed=embed, view=p1_cancel)
         
-        parent = interaction.client.get_channel(THREAD_CHANNEL)
+        config = get_config()
+        parent = interaction.client.get_channel(config.THREAD_CHANNEL)
         team   = Object(
             player_one=interaction.user.id, 
             player_two=other_user.id, 

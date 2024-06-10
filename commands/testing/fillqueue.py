@@ -3,7 +3,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from resources import MatchMaker, Object, Extras, THREAD_CHANNEL
+from resources import MatchMaker, Object, Extras, get_config
 
 class FillQueue(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -12,7 +12,7 @@ class FillQueue(commands.Cog):
     @app_commands.command(
         name="fillqueue", 
         description="test command: add a team to the queue",
-        extras=Extras(defer_ephemerally=True, user_data=True), # type: ignore
+        extras=Extras(defer_ephemerally=True, user_data=True), # 
     )
     async def fillqueue(self, interaction: discord.Interaction[MatchMaker]):
         if not interaction.guild:
@@ -32,8 +32,9 @@ class FillQueue(commands.Cog):
             private_server=f"https://www.roblox.com/games/8204899140/Football-Fusion-2?privateServerLinkCode=73943576065693662579174688833743",
             score=None
         )
-        
-        parent  = interaction.client.get_channel(THREAD_CHANNEL)
+
+        config  = get_config()
+        parent  = interaction.client.get_channel(config.THREAD_CHANNEL)
 
         if not parent or not isinstance(parent, discord.TextChannel):
             return

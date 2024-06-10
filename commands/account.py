@@ -319,7 +319,7 @@ class ManageAccount(commands.Cog):
     @app_commands.command(
         name="account", 
         description="manage your settings & roblox account",
-        extras=Extras(defer_ephemerally=True, user_data=True), # type: ignore
+        extras=Extras(defer_ephemerally=True, user_data=True), # 
     )
     async def account(self, interaction: discord.Interaction[MatchMaker]):
         data = interaction.extras['users'][interaction.user.id]

@@ -7,22 +7,11 @@ import numpy
 from discord import app_commands
 from discord.ext import commands
 
-from resources import MatchMaker, Extras, Colors, THREAD_CHANNEL, Object
+from resources import MatchMaker, Extras, Colors, Object, log_score, trophy_change, get_config
 
 def is_thread(interaction: discord.Interaction) -> bool:
-    return interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent.id == THREAD_CHANNEL
-
-def trophy_change(your_team, opponent_team) -> int:
-    base_change = 37.5
-    is_win      = your_team.score > opponent_team.score
-
-    trophy_factor = (opponent_team.trophies - your_team.trophies) / 100
-    score_factor  = (your_team.score - opponent_team.score) / 5
-
-    if is_win:
-        return int(numpy.clip(base_change + trophy_factor * 10 + score_factor, 25, 50))
-    else:
-        return int(numpy.clip(-base_change + trophy_factor * 10 + score_factor, -50, -25))
+    config = get_config()
+    return interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent.id == config.THREAD_CHANNEL
 
 class Result(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -99,7 +88,7 @@ class Result(commands.Cog):
         for score, voters in dict(sorted(matchup.scores.items(), key=lambda x : len(x[1]), reverse=True)).items():
             team_one_score, team_two_score = tuple(score.split('-'))
             
-            if len(voters) >= 2:
+            if len(voters) >= 3:
                 await interaction.followup.send(
                     content = f"**Result set. Deleting {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=10), "R")}**",
                 )
@@ -134,6 +123,7 @@ class Result(commands.Cog):
 
                     await interaction.client.database.update_user(user)
                 
+                await log_score(interaction.client, matchup, voters, forced=False)
                 return await interaction.client.database.update_match(matchup)
             
             embed.description += f"`{team_one_score:>2}` **- <@{matchup.team_one.player_one}> & <@{matchup.team_one.player_two}>**\n"

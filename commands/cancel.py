@@ -5,7 +5,7 @@ import discord
 from discord import app_commands, ui
 from discord.ext import commands
 
-from resources import MatchMaker, Object, Extras, THREAD_CHANNEL, BaseView, Match, DeleteMessageView
+from resources import MatchMaker, Object, Extras, BaseView, Match, DeleteMessageView, get_config
 
 class CancelGame(BaseView):
     def __init__(self, interaction: discord.Interaction[MatchMaker], matchup: Match):
@@ -62,16 +62,17 @@ class Cancel(commands.Cog):
     @app_commands.command(
         name="cancel", 
         description="cancel match making",
-        extras=Extras(defer=True, user_data=True), # type: ignore
+        extras=Extras(defer=True, user_data=True), # 
     )
     async def cancel(self, interaction: discord.Interaction[MatchMaker]):
-        data = interaction.extras['users'][interaction.user.id]
-        rblx = await self.bot.roblox_client.get_user(data.roblox_id)
+        config = get_config()
+        data   = interaction.extras['users'][interaction.user.id]
+        rblx   = await self.bot.roblox_client.get_user(data.roblox_id)
         
         if not rblx:
             return await interaction.followup.send(content=f"⚠️ **You are not verified. Run /account to verify**", view=DeleteMessageView(interaction, 60))
         
-        if interaction.channel and interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent and interaction.channel.parent.id == THREAD_CHANNEL:
+        if interaction.channel and interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent and interaction.channel.parent.id == config.THREAD_CHANNEL:
             matchup = await interaction.client.database.get_match_by_thread(interaction.channel.id)
             
             if not matchup:

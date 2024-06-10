@@ -8,11 +8,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from resources import MatchMaker, Database
+from resources import MatchMaker
 
 class Formatter(colorlog.ColoredFormatter):
     def converter(self, timestamp):
-        return datetime.datetime.fromtimestamp(timestamp, tz=pytz.timezone('US/Central')).timetuple()
+        return datetime.datetime.fromtimestamp(timestamp=timestamp, tz=pytz.timezone('US/Central')).timetuple()
     
 async def main():
     token  = env['TOKEN']

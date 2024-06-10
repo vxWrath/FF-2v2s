@@ -83,6 +83,11 @@ class Match(Model):
     team_two: Object
     
     scores: Object
+    flags: Object = Field(default_factory=lambda: Object(
+        pinged_players = False,
+        pinged_staff = False,
+        pinged_force = False,
+    ))
 
     @field_serializer("team_one")
     def team_one_to_dict(mapping: Any) -> dict:
@@ -94,4 +99,8 @@ class Match(Model):
     
     @field_serializer("scores")
     def scores_to_dict(mapping: Any) -> dict:
+        return mapping.convert()
+    
+    @field_serializer("flags")
+    def flags_to_dict(mapping: Any) -> dict:
         return mapping.convert()

@@ -5,12 +5,13 @@ from discord import app_commands
 from discord.ext import commands
 from typing import Literal, Optional
 
-from resources import MatchMaker, Extras
+from resources import MatchMaker, Extras, get_config
 
 logger = colorlog.getLogger('bot')
 
 async def owner_only(interaction: discord.Interaction[MatchMaker]):
-    return interaction.user.id in [interaction.client.owner_id]
+    config = get_config()
+    return interaction.user.id in config.DEVELOPERS
 
 @app_commands.guild_only()
 class Sync(commands.Cog):
@@ -23,7 +24,7 @@ class Sync(commands.Cog):
         extras=Extras(defer_ephemerally=True, user_data=True),
     )
     @app_commands.describe(command="the command to execute", globally="whether to globally (un)sync the commands", guild="the guild to (un)sync")
-    #@app_commands.check(owner_only)
+    @app_commands.check(owner_only)
     async def sync(self, interaction: discord.Interaction[MatchMaker], 
                    command : Literal['load', 'sync', 'load & sync', 'unload', 'unsync'], 
                    globally: Optional[Literal["yes", "no"]]="no",

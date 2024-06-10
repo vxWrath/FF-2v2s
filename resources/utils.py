@@ -1,13 +1,16 @@
-from typing import Any, Optional
+from typing import Any, Optional, List
 
 import discord
 import io
+import json
+import numpy
 from colorthief import ColorThief
 from discord.ext.commands import Bot as MatchMaker
 from discord import ui
 
-from .constants import THREAD_LOG
-from .models import Extras, Match
+from .models import Extras, Match, Region
+from .objects import Object
+from .config import get_config
 
 class BaseView(discord.ui.View):
     def __init__(self, timeout: int, interaction: Optional[discord.Interaction[MatchMaker]]=None, extras: Optional[Extras]=None):
@@ -139,7 +142,8 @@ class Colors:
         return color if color.value else Colors.blank
 
 async def send_thread_log(matchup: Match, thread: discord.Thread):
-    thread_log = thread.guild.get_channel(THREAD_LOG)
+    config = get_config()
+    thread_log = thread.guild.get_channel(config.THREAD_LOG)
     
     previous_author = None
     messages = f"THREAD ID - {thread.id} | MATCH ID: {matchup.id}\n\n"
@@ -162,6 +166,53 @@ async def send_thread_log(matchup: Match, thread: discord.Thread):
     
     f = discord.File(io.StringIO(messages.strip()), filename="messages.txt")
     await thread_log.send(file=f)
+
+async def log_score(bot: MatchMaker, matchup: Match, voters: List[int], forced: Optional[bool]=False):
+    embed = discord.Embed(
+        description = (
+            f"# 2v2 Result\n"
+            f"`{matchup.team_one.score or 'NA':>2}` **- <@{matchup.team_one.player_one}> & <@{matchup.team_one.player_two}>** (🏆 {matchup.team_one.trophies})\n"
+            f"`{matchup.team_two.score or 'NA':>2}` **- <@{matchup.team_two.player_one}> & <@{matchup.team_two.player_two}>** (🏆 {matchup.team_two.trophies})\n\n"
+            f"`Region:` **{Region(matchup.region).name}**\n"
+            f"`Started:` {discord.utils.format_dt(matchup.created_at, "f")}\n\n"
+        ),
+        color = Colors.blank,
+        timestamp = discord.utils.utcnow(),
+    )
+    embed.set_footer(text=f"ID: {matchup.id}")
+
+    if forced:
+        embed.set_author(name="This matchup result was FORCED")
+
+    if voters:
+        embed.description += f"`Voters:` *" + ", ".join([f"<@{x}>" for x in voters]) + "*\n\n"
+
+    config = get_config()
+
+    guild = bot.get_guild(config.MAIN_GUILD)
+    score_log = guild.get_channel(config.SCORE_LOG)
+
+    await score_log.send(embed=embed) # ping players
         
+def trophy_change(your_team, opponent_team) -> int:
+    base_change = 37.5
+    is_win      = your_team.score > opponent_team.score
+
+    trophy_factor = (opponent_team.trophies - your_team.trophies) / 100
+    score_factor  = (your_team.score - opponent_team.score) / 5
+
+    if is_win:
+        return int(numpy.clip(base_change + trophy_factor * 10 + score_factor, 25, 50))
+    else:
+        return int(numpy.clip(-base_change + trophy_factor * 10 + score_factor, -50, -25))
+    
+def staff_only():
+    async def pred(interaction: discord.Interaction[MatchMaker]) -> True:
+        if True:
+            return True
+        raise discord.app_commands.CheckFailure()
+        
+    return discord.app_commands.check(pred)
+
 async def setup(bot: MatchMaker):
     pass
