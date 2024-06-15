@@ -7,10 +7,10 @@ import numpy
 from discord import app_commands
 from discord.ext import commands
 
-from resources import MatchMaker, Extras, Colors, Object, staff_only, get_config
+from resources import MatchMaker, Extras, Colors, Object, staff_only, Config
 
 def is_thread(interaction: discord.Interaction) -> bool:
-    config = get_config()
+    config = Config.get()
     return interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent.id == config.THREAD_CHANNEL
 
 @app_commands.guild_only()

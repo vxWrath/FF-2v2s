@@ -5,12 +5,12 @@ from discord import app_commands
 from discord.ext import commands
 from typing import Literal, Optional
 
-from resources import MatchMaker, Extras, get_config
+from resources import MatchMaker, Extras, Config
 
 logger = colorlog.getLogger('bot')
 
 async def owner_only(interaction: discord.Interaction[MatchMaker]):
-    config = get_config()
+    config = Config.get()
     return interaction.user.id in config.DEVELOPERS
 
 @app_commands.guild_only()

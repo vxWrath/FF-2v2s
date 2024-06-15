@@ -1,7 +1,12 @@
+from os import environ as env
+
 import aiohttp
 import datetime
 
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
+from .config import Config
+
+BLOXLINK = env['BLOXLINK']
 
 class RobloxUser:
     def __init__(self, **kwargs):
@@ -45,6 +50,9 @@ class RobloxClient:
         return [RobloxUser(**x) for x in response['data']]
 
     async def get_user(self, user_id: int) -> Optional[RobloxUser]:
+        if not user_id:
+            return None
+
         response = await self.request("get", "users", f"v1/users/{user_id}")
         
         if response.get('errors') is None:
@@ -67,5 +75,18 @@ class RobloxClient:
         
         return {x['targetId']: x['imageUrl'] for x in data['data']}
     
-    async def verify_private_server(self, url: str):
-        pass
+    async def retreive_from_bloxlink(self, discord_id: int, resolve: Optional[bool]=False) -> Optional[Union[int, RobloxUser]]:
+        config = Config.get()
+
+        async with self.session.request("get", f"https://api.blox.link/v4/public/guilds/{config.MAIN_GUILD}/discord-to-roblox/{discord_id}", headers={
+            "Authorization": BLOXLINK,
+        }) as response:
+            data = await response.json()
+
+        if data.get('error'):
+            print(data['error'])
+            return None
+        
+        if not resolve:
+            return data['robloxID']
+        return await self.get_user(data['robloxID'])

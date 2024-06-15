@@ -30,6 +30,10 @@ class Region(Enum):
     def name(self):
         return self._name_.replace('_', ' ')
     
+class CheckFailureType:
+    staff = 1
+    admin = 1
+    
 class Model(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -47,12 +51,10 @@ class Model(BaseModel):
 class User(Model):
     id: int
     roblox_id: Optional[int] = None
-    blacklisted: bool = False
-    
     trophies: int = 0
-    
-    inactive_for: int = 0
-    bonus: int = 0
+
+    banned: bool = False
+    banned_until: Optional[datetime.datetime] = None
 
     settings: Object = Field(default_factory=lambda: Object(
         region = 1, 
@@ -60,15 +62,19 @@ class User(Model):
         party_request_whitelist = [],
         party_request_blacklist = [], 
     ))
-    
-    season: Object = Field(default_factory=lambda: Object({}))
+    record: Object = Field(default_factory=lambda: Object(
+        total_wins    = 0,
+        total_losses  = 0,
+        season_wins   = 0,
+        season_losses = 0,
+    ))
     
     @field_serializer("settings")
     def settings_to_dict(mapping: Any) -> dict:
         return mapping.convert()
     
-    @field_serializer("season")
-    def season_to_dict(mapping: Any) -> dict:
+    @field_serializer("record")
+    def record_to_dict(mapping: Any) -> dict:
         return mapping.convert()
     
 class Match(Model):

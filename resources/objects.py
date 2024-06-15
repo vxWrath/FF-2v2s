@@ -113,11 +113,6 @@ class Object(BaseObject, dict):
                     mapping[key] = int(val)
                 elif val.replace('.', '').isdigit():
                     mapping[key] = float(val)
-                else:
-                    try:
-                        mapping[key] = datetime.datetime.fromisoformat(val)
-                    except ValueError:
-                        pass
                     
         return cls(mapping)
                     
@@ -142,8 +137,6 @@ class Object(BaseObject, dict):
         for key, val in self.items():
             if not isinstance(val, bool) and isinstance(val, (int, float)):
                 mapping[key] = str(val)
-            elif isinstance(val, datetime.datetime):
-                mapping[key] = val.isoformat()
             elif isinstance(val, BaseObject):
                 mapping[key] = val.to_mongo()
             else:
@@ -197,11 +190,6 @@ class ObjectArray(BaseObject, list):
                     array[i] = int(array[i])
                 elif array[i].replace('.', '').isdigit():
                     array[i] = float(array[i])
-                else:
-                    try:
-                        array[i] = datetime.datetime.fromisoformat(array[i])
-                    except ValueError:
-                        pass
                     
         return cls(array)
         
@@ -232,8 +220,6 @@ class ObjectArray(BaseObject, list):
         for i in range(len(self)):
             if isinstance(self[i], (int, float)):
                 array.append(str(self[i]))
-            elif isinstance(self[i], datetime.datetime):
-                array.append(self[i].isoformat())
             elif isinstance(self[i], BaseObject):
                 array.append(self[i].to_mongo())
             else:

@@ -3,7 +3,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from resources import MatchMaker, Object, Extras
+from resources import MatchMaker, Object, Extras, States
 
 class ClearStates(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -12,10 +12,10 @@ class ClearStates(commands.Cog):
     @app_commands.command(
         name="clearstates", 
         description="test command: clears player states within the queue/game system",
-        extras=Extras(defer_ephemerally=True), # 
+        extras=Extras(defer_ephemerally=True),
     )
     async def fillqueue(self, interaction: discord.Interaction[MatchMaker]):
-        interaction.client.states = Object({})
+        interaction.client.states = States(interaction.client)
         await interaction.followup.send(content="done")
         
 async def setup(bot: MatchMaker):

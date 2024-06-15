@@ -5,7 +5,7 @@ import discord
 from discord import app_commands, ui
 from discord.ext import commands
 
-from resources import MatchMaker, Object, Extras, BaseView, Match, DeleteMessageView, get_config
+from resources import MatchMaker, Object, Extras, BaseView, Match, DeleteMessageView, send_thread_log, Config
 
 class CancelGame(BaseView):
     def __init__(self, interaction: discord.Interaction[MatchMaker], matchup: Match):
@@ -21,7 +21,7 @@ class CancelGame(BaseView):
         else:
             self.cancelers.append(interaction.user.id)
 
-        if not interaction.channel or isinstance(interaction.channel, (discord.DMChannel, discord.GroupChannel)):
+        if not interaction.channel:
             return
             
         if len(self.cancelers) == 0:
@@ -33,11 +33,14 @@ class CancelGame(BaseView):
                 content = f"**Deleting {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=10), "R")}**",
                 view = None
             )
-            
-            interaction.client.states.pop(self.matchup.team_one.player_one, None)
-            interaction.client.states.pop(self.matchup.team_one.player_two, None)
-            interaction.client.states.pop(self.matchup.team_two.player_one, None)
-            interaction.client.states.pop(self.matchup.team_two.player_two, None)
+            interaction.client.loop.create_task(send_thread_log(self.matchup, interaction.channel))
+
+            interaction.client.states.remove([
+                self.matchup.team_one.player_one, 
+                self.matchup.team_one.player_two, 
+                self.matchup.team_two.player_one,
+                self.matchup.team_two.player_two
+            ])
             
             await asyncio.sleep(10)
             await interaction.channel.delete()
@@ -65,7 +68,7 @@ class Cancel(commands.Cog):
         extras=Extras(defer=True, user_data=True), # 
     )
     async def cancel(self, interaction: discord.Interaction[MatchMaker]):
-        config = get_config()
+        config = Config.get()
         data   = interaction.extras['users'][interaction.user.id]
         rblx   = await self.bot.roblox_client.get_user(data.roblox_id)
         

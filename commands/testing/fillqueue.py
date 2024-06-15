@@ -3,7 +3,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from resources import MatchMaker, Object, Extras, get_config
+from resources import MatchMaker, Object, Extras, Config
 
 class FillQueue(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -33,13 +33,13 @@ class FillQueue(commands.Cog):
             score=None
         )
 
-        config  = get_config()
+        config  = Config.get()
         parent  = interaction.client.get_channel(config.THREAD_CHANNEL)
 
         if not parent or not isinstance(parent, discord.TextChannel):
             return
 
-        matchup = await interaction.client.queuer.join_queue(team, interaction.client.loop, parent)
+        matchup = await interaction.client.queuer.join_queue(team, parent)
         
         await interaction.followup.send(content="matchup found")
         

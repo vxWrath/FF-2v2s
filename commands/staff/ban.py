@@ -1,26 +1,26 @@
 import discord
 
-from discord import app_commands
+from discord import app_commands, ui
 from discord.ext import commands
+from typing import Optional
 
-from resources import MatchMaker, Object, Extras, send_thread_log, Config
+from resources import MatchMaker, Extras, admin_only
 
-class Test(commands.Cog):
+class Ban(commands.Cog):
     def __init__(self, bot: MatchMaker):
         self.bot: MatchMaker = bot
-        
+
     @app_commands.command(
-        name="test", 
-        description="test command",
-        extras=Extras(defer_ephemerally=True),
+        name="playban", 
+        description="ban someone from playing 2v2s",
+        extras=Extras(defer_ephemerally=True, user_data=True),
     )
-    async def fillqueue(self, interaction: discord.Interaction[MatchMaker]):
-        for item in interaction.client.queuer.queue:
-            print(item)
-        await interaction.followup.send(content="done")
+    @admin_only()
+    async def ban(self, interaction: discord.Interaction[MatchMaker], member: discord.Member, time: Optional[str]):
+        pass
         
 async def setup(bot: MatchMaker):
-    cog = Test(bot)
+    cog = Ban(bot)
     
     for command in cog.walk_app_commands():
         if hasattr(command, "callback"):

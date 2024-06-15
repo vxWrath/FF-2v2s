@@ -46,7 +46,7 @@ class Database:
         
     async def get[T](self, domain: str, item_id: str, cls: Type[T], mongo: bool) -> Optional[T]:
         item = Object.from_redis((await self.redis.hgetall(f"{domain}:{item_id}")) or {})
-            
+
         if mongo and not item:
             item = Object.from_mongo((await self.mongo.matchmaker[domain].find_one({"_id": str(item_id)}) or {}))
             
@@ -165,6 +165,30 @@ class Database:
         }
         
         return [Match(**_change_id(Object.from_mongo(x))) async for x in self.mongo.matchmaker["matches"].find(query)]
+    
+    async def get_user_recent_opponents(self, user_id: int) -> List[int]:
+        query = {
+            "$or": [
+                {"team_one.player_one": str(user_id)},
+                {"team_one.player_two": str(user_id)},
+                {"team_two.player_one": str(user_id)},
+                {"team_two.player_two": str(user_id)}
+            ],
+            "created_at": {"$gte": datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(hours=36)}
+        }
+
+        all_opponents = [
+            [x["team_one"]["player_one"], x["team_one"]["player_two"], x["team_two"]["player_one"], x["team_two"]["player_two"]] 
+            async for x in self.mongo.matchmaker["matches"].find(query)
+        ]
+
+        if not all_opponents:
+            return []
+
+        recent_opps = {int(opp) for matchup in all_opponents for opp in matchup}
+        recent_opps.remove(user_id)
+
+        return list(recent_opps)
     
 def _change_id(item: Object) -> Object:
     item["id"] = item.pop("_id")

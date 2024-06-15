@@ -7,7 +7,7 @@ import uuid
 from discord import app_commands, ui
 from discord.ext import commands
 
-from resources import MatchMaker, Object, Extras, User, Region, RobloxUser, BaseView, BaseModal, Colors, get_config
+from resources import MatchMaker, Object, Extras, User, Region, RobloxUser, BaseView, BaseModal, Colors, Config
 
 FOOTBALL_FUSION_LINK  = "https://www.roblox.com/games/8204899140/Football-Fusion-2#!/game-instances"
 FOOTBALL_FUSION_REGEX = re.compile(r"(?:https:\/\/www\.roblox\.com\/games\/8204899140\/football-fusion-2\?privateserverlinkcode=)([0-9]{25,})", flags=re.IGNORECASE)
@@ -71,6 +71,9 @@ class LinkOrSkip(BaseView):
 
         self.stop()
 
+    async def check_func(self, interaction: discord.Interaction[MatchMaker]):
+        return True
+
 class GetLink(BaseModal):
     link = ui.TextInput(
         label = "Private Server URL (NOT REQUIRED)",
@@ -111,16 +114,16 @@ class SelectTeammate(BaseView):
         other_user = self.users.values[0]
         
         if other_user.bot:
-            return await interaction.followup.send(content=f"❌ **You can't party up with a bot**", ephemeral=True)
+            return await interaction.followup.send(content=f"❌ **You can't play with a bot**", ephemeral=True)
         
         if other_user.id == interaction.user.id:
-            return await interaction.followup.send(content=f"❌ **You can't party up with yourself**", ephemeral=True)
+            return await interaction.followup.send(content=f"❌ **You can't play a game with yourself**", ephemeral=True)
         
-        if interaction.client.states.get(interaction.user.id):
-            return await interaction.followup.send(content=f"❌ **You can't party up because you {interaction.client.states[interaction.user.id].message}**", ephemeral=True)
+        if interaction.client.states[interaction.user.id]:
+            return await interaction.followup.send(content=f"❌ **You can't play because you {interaction.client.states[interaction.user.id].message}**", ephemeral=True)
             
-        if interaction.client.states.get(other_user.id):
-            return await interaction.followup.send(content=f"❌ **You can't party up with {other_user.mention} because they {interaction.client.states[other_user.id].message}**", ephemeral=True)
+        if interaction.client.states[other_user.id]:
+            return await interaction.followup.send(content=f"❌ **You can't play with {other_user.mention} because they {interaction.client.states[other_user.id].message}**", ephemeral=True)
         
         other_data = interaction.extras['users'][other_user.id]
         other_rblx = await interaction.client.roblox_client.get_user(other_data.roblox_id)
@@ -132,12 +135,12 @@ class SelectTeammate(BaseView):
             interaction.user.id in other_data.settings.party_request_blacklist
             or (not other_data.settings.party_requests and interaction.user.id not in other_data.settings.party_request_whitelist)
         ):
-            return await interaction.followup.send(content=f"❌ **You are not allowed to party up with {other_user.mention}**", ephemeral=True)
+            return await interaction.followup.send(content=f"❌ **You are not allowed to play with {other_user.mention}**", ephemeral=True)
         
         if self.data.settings.region != other_data.settings.region:
             return await interaction.followup.send(
                 content = (
-                    f"❌ **You can't party up with {other_user.mention} because you guys are not in the same match making region "
+                    f"❌ **You can't play with {other_user.mention} because you guys are not in the same match making region "
                     f"(`{Region(self.data.settings.region).name}`)**"
                 ),
                 ephemeral=True
@@ -154,7 +157,7 @@ class SelectTeammate(BaseView):
             color = Colors.blank,
         )
         embed.set_author(name=interaction.user.name, icon_url=interaction.user.display_avatar.url)
-        embed.set_footer(text="This message will be updated whether they accept it or not")
+        embed.set_footer(text="This message will be updated whether they accept it or not. Do NOT click dismiss message")
 
         await interaction.edit_original_response(embed=embed, view=None)
 
@@ -187,7 +190,7 @@ class SelectTeammate(BaseView):
         elif invite.result == "already":
             await asyncio.sleep(1)
             
-            embed.description = f"**You can't party up with {other_user.mention} because you {interaction.client.states[interaction.user.id].message}**"
+            embed.description = f"**You can't play with {other_user.mention} because you {interaction.client.states[interaction.user.id].message}**"
             return await interaction.edit_original_response(embed=embed)
         
         private_server_text = f"✅ ({interaction.user.mention}'s server)" if self.private_server else None
@@ -203,7 +206,7 @@ class SelectTeammate(BaseView):
         )
         
         if not self.private_server and not invite.private_server:
-            embed.set_footer(text="Since neither of you have a private server, it may take longer to find a game")
+            embed.set_footer(text="Do NOT click dismiss message. Additionally, since neither of you have a private server, it may take longer to find a game.")
 
         view = FindGameButton(120, interaction)
         await interaction.edit_original_response(embed=embed, view=view)
@@ -217,8 +220,7 @@ class SelectTeammate(BaseView):
             await invite.interaction.response.edit_message(embed=embed, view=None)
             
         if await view.wait():
-            interaction.client.states.pop(interaction.user.id, None)
-            interaction.client.states.pop(other_user.id, None)
+            interaction.client.states.remove([interaction.user.id, other_user.id])
             
             embed.remove_footer()
             embed.set_author(name=interaction.user.name, icon_url=interaction.user.display_avatar.url)
@@ -246,12 +248,11 @@ class SelectTeammate(BaseView):
             embed.set_author(name=interaction.user.name, icon_url=interaction.user.display_avatar.url)
             message = await other_user.send(embed=embed, view=p2_cancel)
         except discord.HTTPException:
-            interaction.client.states.pop(interaction.user.id, None)
-            interaction.client.states.pop(other_user.id, None)
+            interaction.client.states.remove([interaction.user.id, other_user.id])
             
             embed.remove_footer()
             
-            embed.description = f"❌ **You can't party up with {other_user.mention} anymore because they closed their DMs**"
+            embed.description = f"❌ **You can't play with {other_user.mention} anymore because they have their DMs closed**"
             return await interaction.edit_original_response(embed=embed, view=None)
         
         timeout_task = interaction.client.loop.create_task(asyncio.sleep(timeout.total_seconds()))
@@ -262,7 +263,7 @@ class SelectTeammate(BaseView):
         embed.set_author(name=other_user.name, icon_url=other_user.display_avatar.url)
         await interaction.edit_original_response(embed=embed, view=p1_cancel)
         
-        config = get_config()
+        config = Config.get()
         parent = interaction.client.get_channel(config.THREAD_CHANNEL)
         team   = Object(
             player_one=interaction.user.id, 
@@ -272,7 +273,7 @@ class SelectTeammate(BaseView):
             private_server=self.private_server or invite.private_server,
             score=None
         )
-        match_making_task = interaction.client.loop.create_task(interaction.client.queuer.join_queue(team, interaction.client.loop, parent))
+        match_making_task = interaction.client.loop.create_task(interaction.client.queuer.join_queue(team, parent))
         
         done, pending = await asyncio.wait(
             [p1_task, p2_task, timeout_task, match_making_task],
@@ -282,8 +283,7 @@ class SelectTeammate(BaseView):
         task = done.pop()
         
         if task != match_making_task:
-            interaction.client.states.pop(interaction.user.id, None)
-            interaction.client.states.pop(other_user.id, None)
+            interaction.client.states.remove([interaction.user.id, other_user.id])
             
             item = [x for x in interaction.client.queuer.queue if x.team == team][0]
             item.future.set_result(None)
@@ -327,8 +327,7 @@ class SelectTeammate(BaseView):
         matchup = match_making_task.result()
         
         if isinstance(matchup, Object):
-            interaction.client.states.pop(interaction.user.id, None)
-            interaction.client.states.pop(other_user.id, None)
+            interaction.client.states.remove([interaction.user.id, other_user.id])
             
             if matchup.canceled_by.id == interaction.user.id:
                 embed.description = f"❌ **Matchmaking canceled by {interaction.user.mention}**"
@@ -343,9 +342,8 @@ class SelectTeammate(BaseView):
                 embed.set_author(name=other_user.name, icon_url=other_user.display_avatar.url)
                 return await interaction.followup.send(embed=embed, ephemeral=True)
             
-        interaction.client.states[interaction.user.id] = Object(last_updated=discord.utils.utcnow(), message="are already in a game", type="in-game")
-        interaction.client.states[other_user.id] = Object(last_updated=discord.utils.utcnow(), message="are already in a game", type="in-game")
-        
+        interaction.client.states.update([interaction.user.id, other_user.id], new_action="playing")
+            
         thread = parent.get_thread(matchup.thread)
         
         embed.description = (
@@ -380,9 +378,9 @@ class Invite(BaseView):
 
     @ui.button(label="Accept", style=discord.ButtonStyle.green)
     async def accept(self, interaction: discord.Interaction[MatchMaker], _):
-        if interaction.client.states.get(interaction.user.id):
+        if interaction.client.states[interaction.user.id]:
             embed = discord.Embed(
-                description = f"❌ **You can't party up because you {interaction.client.states[interaction.user.id].message}. Deleting this message {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=30), "R")}**",
+                description = f"❌ **You can't play because you {interaction.client.states[interaction.user.id].message}. Deleting this message {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=30), "R")}**",
                 color = Colors.blank
             )
             embed.set_author(name=self.inviter.name, icon_url=self.inviter.display_avatar.url)
@@ -391,9 +389,9 @@ class Invite(BaseView):
             self.result = "declined"
             self.stop()
 
-        if interaction.client.states.get(self.inviter.id):
+        if interaction.client.states[self.inviter.id]:
             embed = discord.Embed(
-                description = f"❌ **You can't party up with {self.inviter.mention} because they {interaction.client.states[self.inviter.id].message}. Deleting this message {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=30), "R")}**",
+                description = f"❌ **You can't play with {self.inviter.mention} because they {interaction.client.states[self.inviter.id].message}. Deleting this message {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=30), "R")}**",
                 color = Colors.blank
             )
             embed.set_author(name=self.inviter.name, icon_url=self.inviter.display_avatar.url)
@@ -404,8 +402,7 @@ class Invite(BaseView):
 
         self.result = "accepted"
 
-        interaction.client.states[interaction.user.id] = Object(last_updated=discord.utils.utcnow(), message="are already finding a game", type="finding")
-        interaction.client.states[self.inviter.id] = Object(last_updated=discord.utils.utcnow(), message="are already finding a game", type="finding")
+        interaction.client.states.update([interaction.user.id, self.inviter.id], new_action="queueing")
 
         if not self.private_server:
             embed = discord.Embed(
@@ -479,8 +476,8 @@ class Play(commands.Cog):
         if not rblx:
             return await interaction.followup.send(content=f"⚠️ **You are not verified. Run /account to verify**")
         
-        if interaction.client.states.get(interaction.user.id):
-            return await interaction.followup.send(content=f"❌ **You can't party up because you {interaction.client.states[interaction.user.id].message}**")
+        if interaction.client.states[interaction.user.id]:
+            return await interaction.followup.send(content=f"❌ **You can't play because you {interaction.client.states[interaction.user.id].message}**")
         
         embed = discord.Embed(
             description = f"**If you have an active private server for [Football Fusion 2]({FOOTBALL_FUSION_LINK}), provide the link below.**",

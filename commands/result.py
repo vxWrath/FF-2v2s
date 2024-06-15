@@ -7,10 +7,10 @@ import numpy
 from discord import app_commands
 from discord.ext import commands
 
-from resources import MatchMaker, Extras, Colors, Object, log_score, trophy_change, get_config
+from resources import MatchMaker, Extras, Colors, Object, log_score, trophy_change, send_thread_log, Config
 
 def is_thread(interaction: discord.Interaction) -> bool:
-    config = get_config()
+    config = Config.get()
     return interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent.id == config.THREAD_CHANNEL
 
 class Result(commands.Cog):
@@ -88,18 +88,21 @@ class Result(commands.Cog):
         for score, voters in dict(sorted(matchup.scores.items(), key=lambda x : len(x[1]), reverse=True)).items():
             team_one_score, team_two_score = tuple(score.split('-'))
             
-            if len(voters) >= 3:
+            if len(voters) >= 2:
                 await interaction.followup.send(
                     content = f"**Result set. Deleting {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=10), "R")}**",
                 )
+                interaction.client.loop.create_task(send_thread_log(matchup, interaction.channel))
             
                 matchup.team_one.score = int(team_one_score)
                 matchup.team_two.score = int(team_two_score)
                 
-                interaction.client.states.pop(matchup.team_one.player_one, None)
-                interaction.client.states.pop(matchup.team_one.player_two, None)
-                interaction.client.states.pop(matchup.team_two.player_one, None)
-                interaction.client.states.pop(matchup.team_two.player_two, None)
+                interaction.client.states.remove([
+                    matchup.team_one.player_one, 
+                    matchup.team_one.player_two, 
+                    matchup.team_two.player_one,
+                    matchup.team_two.player_two
+                ])
                 
                 await asyncio.sleep(10)
                 await interaction.channel.delete()

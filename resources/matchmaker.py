@@ -5,7 +5,6 @@ import sys
 import colorlog
 
 import discord
-from typing import Dict
 from discord.app_commands import Command, CommandTree, errors
 from discord.ext import commands
 
@@ -21,6 +20,7 @@ from .database import Database
 from .objects import Object
 from .queue import Queue
 from .roblox import RobloxClient
+from .states import States
 
 class MatchMaker(commands.Bot):
     def __init__(self):
@@ -33,10 +33,11 @@ class MatchMaker(commands.Bot):
             chunk_guilds_at_startup = True # turn this off if the bot gets big
         )
         
-        self.external_session: aiohttp.ClientSession = aiohttp.ClientSession()
-        self.database: Database = Database()
-        self.queuer: Queue = Queue(self.database)
-        self.states: Object = Object({})
+        self.production       = False if sys.platform == 'win32' else True
+        self.external_session = aiohttp.ClientSession()
+        self.database         = Database()
+        self.queuer           = Queue(self)
+        self.states           = States(self)
         
     async def setup_hook(self) -> None:
         self.loop.create_task(self.database.ping_loop())
@@ -47,6 +48,10 @@ class MatchMaker(commands.Bot):
         logger = colorlog.getLogger('bot')
         logger.info(f"Logged in - {self.user.name} ({self.application_id})")
         logger.info(f"Loaded {len([x for x in self.tree.walk_commands() if isinstance(x, Command)])} Commands")
+
+        # adds the play panel to persistent views
+        cog = self.get_cog('Events')
+        cog.add_view()
         
     async def load_extensions(self):
         self._cogs_ = ["resources.utils", "resources.queue"]
@@ -108,7 +113,7 @@ class AppCommandTree(CommandTree[MatchMaker]):
                     
                     if interaction.data.resolved:
                         for user_id, user_data in (interaction.data.resolved.members or interaction.data.resolved.users or {}).items():
-                            if user_data.get('bot', False) or interaction.user.id == int(user_id):
+                            if user_data.get('bot', False) or user_data.get('user', {}).get('bot', False) or interaction.user.id == int(user_id):
                                 continue
                             
                             interaction.extras.users[int(user_id)] = await self.client.database.produce_user(int(user_id))

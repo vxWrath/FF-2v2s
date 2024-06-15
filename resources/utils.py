@@ -8,9 +8,9 @@ from colorthief import ColorThief
 from discord.ext.commands import Bot as MatchMaker
 from discord import ui
 
-from .models import Extras, Match, Region
-from .objects import Object
-from .config import get_config
+from .exceptions import CheckFailure
+from .models import Extras, Match, Region, CheckFailureType
+from .config import Config
 
 class BaseView(discord.ui.View):
     def __init__(self, timeout: int, interaction: Optional[discord.Interaction[MatchMaker]]=None, extras: Optional[Extras]=None):
@@ -141,31 +141,42 @@ class Colors:
     def ensure_color(color: discord.Color) -> discord.Color:
         return color if color.value else Colors.blank
 
+def _format_bot_message(message: discord.Message, prev: bool=False) -> str:
+    if message.embeds:
+        desc = message.embeds[0].description or 'No Description'
+        desc = discord.utils.remove_markdown(desc).strip().replace('\n', '\n\t')
+
+        return f"Embed:\n\t{desc}\n"
+    else:
+        return f"{discord.utils.remove_markdown(message.clean_content)}"
+
 async def send_thread_log(matchup: Match, thread: discord.Thread):
-    config = get_config()
+    config = Config.get()
     thread_log = thread.guild.get_channel(config.THREAD_LOG)
     
     previous_author = None
-    messages = f"THREAD ID - {thread.id} | MATCH ID: {matchup.id}\n\n"
+
+    content  = f"THREAD ID - {thread.id} | MATCH ID: {matchup.id}"
+    messages = "THREAD START\n"
+    i        = 1
     
     async for message in thread.history(limit=250, oldest_first=True):
         if message.author.bot:
             if previous_author == message.author:
-                messages += f"-- BOT MESSAGE --\n"
+                messages += f"{i}) {_format_bot_message(message, prev=True)}\n"
             else:
-                messages += f"\n-- BOT MESSAGE --\n"
-            
-            previous_author = message.author
+                messages += f"\n{message.author.name} ({message.author.id}) @ {message.created_at.strftime('%m/%d/%Y %r')}\n{i}) {_format_bot_message(message)}\n"
         else:
             if previous_author == message.author:
-                messages += f"{discord.utils.escape_mentions(message.clean_content)}\n"
+                messages += f"{i}) {discord.utils.remove_markdown(message.clean_content)}\n"
             else:
-                messages += f"\n{message.author.name} ({message.author.id}) @ {message.created_at.strftime('%m/%d/%Y %r')}\n{message.clean_content}\n"
+                messages += f"\n{message.author.name} ({message.author.id}) @ {message.created_at.strftime('%m/%d/%Y %r')}\n{i}) {discord.utils.remove_markdown(message.clean_content)}\n"
                 
+        i += 1
         previous_author = message.author
     
     f = discord.File(io.StringIO(messages.strip()), filename="messages.txt")
-    await thread_log.send(file=f)
+    await thread_log.send(content=content, file=f)
 
 async def log_score(bot: MatchMaker, matchup: Match, voters: List[int], forced: Optional[bool]=False):
     embed = discord.Embed(
@@ -187,12 +198,15 @@ async def log_score(bot: MatchMaker, matchup: Match, voters: List[int], forced: 
     if voters:
         embed.description += f"`Voters:` *" + ", ".join([f"<@{x}>" for x in voters]) + "*\n\n"
 
-    config = get_config()
+    config = Config.get()
 
     guild = bot.get_guild(config.MAIN_GUILD)
     score_log = guild.get_channel(config.SCORE_LOG)
 
-    await score_log.send(embed=embed) # ping players
+    await score_log.send(
+        content = f"<@{matchup.team_one.player_one}> <@{matchup.team_one.player_two}> <@{matchup.team_two.player_one}> <@{matchup.team_two.player_two}>",
+        embed = embed
+    )
         
 def trophy_change(your_team, opponent_team) -> int:
     base_change = 37.5
@@ -202,15 +216,24 @@ def trophy_change(your_team, opponent_team) -> int:
     score_factor  = (your_team.score - opponent_team.score) / 5
 
     if is_win:
-        return int(numpy.clip(base_change + trophy_factor * 10 + score_factor, 25, 50))
+        return int(numpy.clip(base_change + trophy_factor * 10 + score_factor, 10, 50))
     else:
-        return int(numpy.clip(-base_change + trophy_factor * 10 + score_factor, -50, -25))
+        return int(numpy.clip(-base_change + trophy_factor * 10 + score_factor, -50, -10))
     
 def staff_only():
     async def pred(interaction: discord.Interaction[MatchMaker]) -> True:
-        if True:
+        if interaction.user.get_role(Config.get()['STAFF_ROLE']):
             return True
-        raise discord.app_commands.CheckFailure()
+        raise CheckFailure(CheckFailureType.staff)
+        
+    return discord.app_commands.check(pred)
+
+def admin_only():
+    async def pred(interaction: discord.Interaction[MatchMaker]) -> True:
+        config = Config.get()
+        if interaction.user.id in config['ADMINS'] + config['DEVELOPERS']:
+            return True
+        raise CheckFailure(CheckFailureType.admin)
         
     return discord.app_commands.check(pred)
 

@@ -4,7 +4,7 @@ import datetime
 import discord
 
 from discord.ext import commands, tasks
-from resources import MatchMaker, Colors, Object, log_score, trophy_change, get_config
+from resources import MatchMaker, Colors, Object, log_score, trophy_change, send_thread_log, Config
 
 logger = colorlog.getLogger("bot")
 
@@ -33,7 +33,7 @@ class Tasks(commands.Cog):
     async def auto_result(self):
         logger.debug("Running auto-result")
 
-        config = get_config()
+        config = Config.get()
         now    = discord.utils.utcnow()
         guild  = self.bot.get_guild(config.MAIN_GUILD)
 
@@ -44,7 +44,7 @@ class Tasks(commands.Cog):
                 logger.info(f"Deleted Match ID {matchup.id}")
                 return await self.bot.database.delete_match(matchup)
 
-            if matchup.created_at + datetime.timedelta(hours=24) < now:
+            if not matchup.flags.pinged_force and matchup.created_at + datetime.timedelta(hours=24) < now:
                 max_voters  = max([len(voters) for voters in matchup.scores.values()] or [0])
                 tied_scores = {score: voters for score, voters in matchup.scores.items() if len(voters) == max_voters}
 
@@ -62,16 +62,19 @@ class Tasks(commands.Cog):
                     await thread.send(
                         content = f"**Result automatically set. Deleting {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=10), "R")}**",
                     )
+                    self.bot.loop.create_task(send_thread_log(matchup, thread))
 
                     team_one_score, team_two_score = tuple(list(tied_scores.keys())[0].split('-'))
 
                     matchup.team_one.score = int(team_one_score)
                     matchup.team_two.score = int(team_two_score)
                     
-                    self.bot.states.pop(matchup.team_one.player_one, None)
-                    self.bot.states.pop(matchup.team_one.player_two, None)
-                    self.bot.states.pop(matchup.team_two.player_one, None)
-                    self.bot.states.pop(matchup.team_two.player_two, None)
+                    self.bot.states.remove([
+                        matchup.team_one.player_one, 
+                        matchup.team_one.player_two, 
+                        matchup.team_two.player_one,
+                        matchup.team_two.player_two
+                    ])
                     
                     await asyncio.sleep(10)
                     await thread.delete()
@@ -119,7 +122,7 @@ class Tasks(commands.Cog):
                 )
 
                 await thread.send(
-                    content = f"<@{matchup.team_one.player_one}> <@{matchup.team_one.player_two}> <{matchup.team_two.player_one}> <{matchup.team_two.player_two}>", # ping players
+                    content = f"<@{matchup.team_one.player_one}> <@{matchup.team_one.player_two}> <@{matchup.team_two.player_one}> <@{matchup.team_two.player_two}>",
                     embed   = embed
                 )
 
@@ -128,7 +131,19 @@ class Tasks(commands.Cog):
 
         logger.debug("Finished auto-result")
 
+    @tasks.loop(minutes=15)
+    async def auto_clear_states(self):
+        logger.debug("Running auto-clear-state")
+
+        self.bot.states.remove([
+            key for key, state in self.bot.states.items() 
+            if state.last_updated + datetime.timedelta(hours=25) > discord.utils.utcnow()
+        ])
+
+        logger.debug("Finished auto-clear-state")
+
     @auto_result.error
+    @auto_clear_states.error
     async def error(self, error: Exception):
         self.auto_result.cancel()
 
