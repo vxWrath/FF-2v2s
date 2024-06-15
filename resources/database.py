@@ -110,15 +110,20 @@ class Database:
             
         return user
     
-    async def create_match(self, match_id: int, created_at: datetime.datetime, region: int, thread: int, team_one: Object[str, Any], team_two: Object[str, Any], scores: Object[str, List[int]], score_message: Optional[int]):
+    async def create_match(self, 
+        match_id: int, 
+        created_at: datetime.datetime, 
+        region: int, 
+        thread: int, 
+        team_one: Object[str, Any], 
+        team_two: Object[str, Any], 
+    ):
         return await self.create("matches", str(match_id), Match, **{
             "region": region, 
             "created_at": created_at,
             "thread": thread,
             "team_one": team_one,
             "team_two": team_two,
-            "scores": scores,
-            "score_message": score_message,
         })
         
     async def update_match(self, match: Match) -> None:

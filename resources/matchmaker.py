@@ -122,6 +122,3 @@ class AppCommandTree(CommandTree[MatchMaker]):
                 pass
         
         return True
-    
-    async def on_error(self, interaction: discord.Interaction[MatchMaker], error: errors.AppCommandError) -> None:
-        raise error

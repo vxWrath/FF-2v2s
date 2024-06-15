@@ -150,7 +150,7 @@ def _format_bot_message(message: discord.Message, prev: bool=False) -> str:
     else:
         return f"{discord.utils.remove_markdown(message.clean_content)}"
 
-async def send_thread_log(matchup: Match, thread: discord.Thread):
+async def send_thread_log(matchup: Match, thread: discord.Thread) -> int:
     config = Config.get()
     thread_log = thread.guild.get_channel(config.THREAD_LOG)
     
@@ -176,7 +176,9 @@ async def send_thread_log(matchup: Match, thread: discord.Thread):
         previous_author = message.author
     
     f = discord.File(io.StringIO(messages.strip()), filename="messages.txt")
-    await thread_log.send(content=content, file=f)
+    msg = await thread_log.send(content=content, file=f)
+
+    return msg.id
 
 async def log_score(bot: MatchMaker, matchup: Match, voters: List[int], forced: Optional[bool]=False):
     embed = discord.Embed(
@@ -222,7 +224,9 @@ def trophy_change(your_team, opponent_team) -> int:
     
 def staff_only():
     async def pred(interaction: discord.Interaction[MatchMaker]) -> True:
-        if interaction.user.get_role(Config.get()['STAFF_ROLE']):
+        config = Config.get()
+
+        if interaction.user.id in config['ADMINS'] + config['DEVELOPERS'] or interaction.user.get_role(config['STAFF_ROLE']):
             return True
         raise CheckFailure(CheckFailureType.staff)
         
@@ -231,6 +235,7 @@ def staff_only():
 def admin_only():
     async def pred(interaction: discord.Interaction[MatchMaker]) -> True:
         config = Config.get()
+        
         if interaction.user.id in config['ADMINS'] + config['DEVELOPERS']:
             return True
         raise CheckFailure(CheckFailureType.admin)

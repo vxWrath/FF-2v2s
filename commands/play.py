@@ -7,7 +7,7 @@ import uuid
 from discord import app_commands, ui
 from discord.ext import commands
 
-from resources import MatchMaker, Object, Extras, User, Region, RobloxUser, BaseView, BaseModal, Colors, Config
+from resources import MatchMaker, Object, Extras, User, Region, RobloxUser, BaseView, BaseModal, Colors, Config, Unverified
 
 FOOTBALL_FUSION_LINK  = "https://www.roblox.com/games/8204899140/Football-Fusion-2#!/game-instances"
 FOOTBALL_FUSION_REGEX = re.compile(r"(?:https:\/\/www\.roblox\.com\/games\/8204899140\/football-fusion-2\?privateserverlinkcode=)([0-9]{25,})", flags=re.IGNORECASE)
@@ -474,7 +474,7 @@ class Play(commands.Cog):
         rblx = await self.bot.roblox_client.get_user(data.roblox_id)
         
         if not rblx:
-            return await interaction.followup.send(content=f"⚠️ **You are not verified. Run /account to verify**")
+            raise Unverified(interaction.user)
         
         if interaction.client.states[interaction.user.id]:
             return await interaction.followup.send(content=f"❌ **You can't play because you {interaction.client.states[interaction.user.id].message}**")

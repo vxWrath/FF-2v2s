@@ -90,11 +90,25 @@ class Tasks(commands.Cog):
                         user = await self.bot.database.produce_user(player)
                         user.trophies = max(user.trophies + team_one_change, 0)
 
+                        if matchup.team_one.score > matchup.team_two.score:
+                            user.record.total_wins += 1
+                            user.record.season_wins += 1
+                        else:
+                            user.record.total_losses += 1
+                            user.record.season_losses += 1
+
                         await self.bot.database.update_user(user)
 
                     for player in [matchup.team_two.player_one, matchup.team_two.player_two]:
                         user = await self.bot.database.produce_user(player)
                         user.trophies = max(user.trophies + team_two_change, 0)
+
+                        if matchup.team_one.score > matchup.team_two.score:
+                            user.record.total_losses += 1
+                            user.record.season_losses += 1
+                        else:
+                            user.record.total_wins += 1
+                            user.record.season_wins += 1
 
                         await self.bot.database.update_user(user)
                     
@@ -131,13 +145,18 @@ class Tasks(commands.Cog):
 
         logger.debug("Finished auto-result")
 
-    @tasks.loop(minutes=15)
+    @tasks.loop(minutes=5)
     async def auto_clear_states(self):
         logger.debug("Running auto-clear-state")
 
         self.bot.states.remove([
             key for key, state in self.bot.states.items() 
-            if state.last_updated + datetime.timedelta(hours=25) > discord.utils.utcnow()
+            if state.action == "queueing" and state.last_updated + datetime.timedelta(minutes=15) < discord.utils.utcnow()
+        ])
+
+        self.bot.states.remove([
+            key for key, state in self.bot.states.items() 
+            if state.action == "playing" and state.last_updated + datetime.timedelta(hours=25) < discord.utils.utcnow()
         ])
 
         logger.debug("Finished auto-clear-state")

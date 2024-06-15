@@ -15,8 +15,19 @@ class Ban(commands.Cog):
         description="ban someone from playing 2v2s",
         extras=Extras(defer_ephemerally=True, user_data=True),
     )
+    @app_commands.choices(time=[
+        app_commands.Choice(name="12 hours", value=43200),
+        app_commands.Choice(name="1 day", value=86400),
+        app_commands.Choice(name="3 days", value=259200),
+        app_commands.Choice(name="7 days", value=604800),
+        app_commands.Choice(name="14 days", value=1209600),
+        app_commands.Choice(name="30 days", value=2592000),
+        app_commands.Choice(name="60 days", value=51840000),
+        app_commands.Choice(name="90 days", value=7776000),
+        app_commands.Choice(name="Forever", value=0),
+    ])
     @admin_only()
-    async def ban(self, interaction: discord.Interaction[MatchMaker], member: discord.Member, time: Optional[str]):
+    async def ban(self, interaction: discord.Interaction[MatchMaker], member: discord.Member, time: app_commands.Choice[int]):
         pass
         
 async def setup(bot: MatchMaker):

@@ -1,8 +1,8 @@
 from .config import Config
 from .database import Database
-from .exceptions import MatchMakerException, NoRobloxUser
+from .exceptions import MatchMakerException, Unverified, CheckFailure
 from .matchmaker import MatchMaker
-from .models import Extras, Region, User, Match
+from .models import Extras, Region, User, Match, CheckFailureType
 from .objects import BaseObject, Object, ObjectArray
 from .queue import Queue
 from .roblox import RobloxClient, RobloxUser

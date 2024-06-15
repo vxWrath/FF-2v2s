@@ -96,7 +96,7 @@ class Queue:
                     
                 await message.reply(content=f":bangbang: `Match ID:` **{match_id}**")
                     
-                match  = await self.database.create_match(match_id, discord.utils.utcnow(), item.team.region, thread.id, item.team, team, Object({}), None)
+                match  = await self.database.create_match(match_id, discord.utils.utcnow(), item.team.region, thread.id, item.team, team)
                 future = item.future.set_result(match)
                 
                 return match
@@ -105,7 +105,7 @@ class Queue:
         item   = Object(team=team, future=future, queued_since=discord.utils.utcnow(), trophy_search_range=INITIAL_SEARCH_RANGE)
 
         self.queue.append(item)
-        self.bot.loop.create_task(self.increment(item))
+        self.bot.loop.create_task(self.increment_loop(item))
 
         try:
             await future
@@ -113,7 +113,10 @@ class Queue:
         except Exception as e:
             raise e
         
-    async def increment(self, item: Object):
+    # TODO:
+    # reloop through the queue once an increment happens
+        
+    async def increment_loop(self, item: Object):
         while True:
             increment_task = self.bot.loop.create_task(asyncio.sleep(INCREMENT_INTERVAL))
 

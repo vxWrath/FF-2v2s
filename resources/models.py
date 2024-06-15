@@ -32,7 +32,7 @@ class Region(Enum):
     
 class CheckFailureType:
     staff = 1
-    admin = 1
+    admin = 2
     
 class Model(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -79,16 +79,18 @@ class User(Model):
     
 class Match(Model):
     id: int
+    
     created_at: datetime.datetime
     region: int
-
-    thread: Optional[int] = None
-    score_message: Optional[int] = None
+    thread: int
 
     team_one: Object
     team_two: Object
     
-    scores: Object
+    log_message: Optional[int] = None
+    score_message: Optional[int] = None
+
+    scores: Object = Field(default_factory=lambda: Object({}))
     flags: Object = Field(default_factory=lambda: Object(
         pinged_players = False,
         pinged_staff = False,

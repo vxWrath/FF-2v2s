@@ -7,7 +7,7 @@ import numpy
 from discord import app_commands
 from discord.ext import commands
 
-from resources import MatchMaker, Extras, Colors, Object, log_score, trophy_change, send_thread_log, Config
+from resources import MatchMaker, Extras, Colors, Object, log_score, trophy_change, send_thread_log, Config, Unverified
 
 def is_thread(interaction: discord.Interaction) -> bool:
     config = Config.get()
@@ -33,7 +33,7 @@ class Result(commands.Cog):
         rblx = await self.bot.roblox_client.get_user(data.roblox_id)
         
         if not rblx:
-            return await interaction.followup.send(content=f"⚠️ **You are not verified. Run /account to verify**")
+            raise Unverified(interaction.user)
         
         matchup = await interaction.client.database.get_match_by_thread(interaction.channel.id)
         
@@ -89,10 +89,11 @@ class Result(commands.Cog):
             team_one_score, team_two_score = tuple(score.split('-'))
             
             if len(voters) >= 2:
+                matchup.log_message = await send_thread_log(matchup, interaction.channel)
+
                 await interaction.followup.send(
                     content = f"**Result set. Deleting {discord.utils.format_dt(discord.utils.utcnow() + datetime.timedelta(seconds=10), "R")}**",
                 )
-                interaction.client.loop.create_task(send_thread_log(matchup, interaction.channel))
             
                 matchup.team_one.score = int(team_one_score)
                 matchup.team_two.score = int(team_two_score)
@@ -118,16 +119,30 @@ class Result(commands.Cog):
                     user = await interaction.client.database.produce_user(player)
                     user.trophies = max(user.trophies + team_one_change, 0)
 
+                    if matchup.team_one.score > matchup.team_two.score:
+                        user.record.total_wins += 1
+                        user.record.season_wins += 1
+                    else:
+                        user.record.total_losses += 1
+                        user.record.season_losses += 1
+
                     await interaction.client.database.update_user(user)
 
                 for player in [matchup.team_two.player_one, matchup.team_two.player_two]:
                     user = await interaction.client.database.produce_user(player)
                     user.trophies = max(user.trophies + team_two_change, 0)
 
+                    if matchup.team_one.score > matchup.team_two.score:
+                        user.record.total_losses += 1
+                        user.record.season_losses += 1
+                    else:
+                        user.record.total_wins += 1
+                        user.record.season_wins += 1
+
                     await interaction.client.database.update_user(user)
                 
-                await log_score(interaction.client, matchup, voters, forced=False)
-                return await interaction.client.database.update_match(matchup)
+                await interaction.client.database.update_match(matchup)
+                return await log_score(interaction.client, matchup, voters, forced=False)
             
             embed.description += f"`{team_one_score:>2}` **- <@{matchup.team_one.player_one}> & <@{matchup.team_one.player_two}>**\n"
             embed.description += f"`{team_two_score:>2}` **- <@{matchup.team_two.player_one}> & <@{matchup.team_two.player_two}>**\n"

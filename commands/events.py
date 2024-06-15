@@ -3,7 +3,7 @@ import asyncio
 
 from discord.ext import commands
 from discord import ui
-from resources import MatchMaker, Colors, Extras, BaseView, Config
+from resources import MatchMaker, Colors, Extras, BaseView, Config, Unverified
 from typing import Optional
 
 from .play import LinkOrSkip, FOOTBALL_FUSION_LINK
@@ -20,10 +20,10 @@ class Play(BaseView):
         rblx = await interaction.client.roblox_client.get_user(data.roblox_id)
         
         if not rblx:
-            return await interaction.followup.send(content=f"⚠️ **You are not verified. Run /account to verify**")
+            raise Unverified(interaction.user)
         
         if interaction.client.states[interaction.user.id]:
-            return await interaction.followup.send(content=f"❌ **You can't play because you {interaction.client.states[interaction.user.id].message}**")
+            return await interaction.followup.send(content=f"❌ **You can't play because you {interaction.client.states[interaction.user.id].message}**", ephemeral=True)
         
         embed = discord.Embed(
             description = f"**If you have an active private server for [Football Fusion 2]({FOOTBALL_FUSION_LINK}), provide the link below.**",

@@ -4,7 +4,7 @@ from discord import app_commands, ui
 from discord.ext import commands
 from typing import List
 
-from resources import MatchMaker, Extras, Colors, Region, BaseView, Match
+from resources import MatchMaker, Extras, Colors, Region, BaseView, Match, Unverified
 
 class MatchScroller(BaseView):
     def __init__(self, interaction: discord.Interaction[MatchMaker], matches: List[Match]):
@@ -135,7 +135,7 @@ class ViewMatches(commands.Cog):
         rblx = await self.bot.roblox_client.get_user(data.roblox_id)
         
         if not rblx:
-            return await interaction.followup.send(content=f"⚠️ **You are not verified. Run /account to verify**")
+            raise Unverified(interaction.user)
 
         matches = await interaction.client.database.get_user_matches(interaction.user.id)
         view    = MatchScroller(interaction, matches)

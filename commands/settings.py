@@ -9,7 +9,7 @@ from discord import app_commands, ui
 from discord.ext import commands
 from typing import Literal
 
-from resources import MatchMaker, Object, Extras, User, RobloxUser, BaseView, BaseModal, Colors, Region, NoRobloxUser, DeleteMessageView
+from resources import MatchMaker, Object, Extras, User, RobloxUser, BaseView, BaseModal, Colors, Region, DeleteMessageView
 
 class SelectRegion(BaseView):
     def __init__(self, interaction: discord.Interaction[MatchMaker], view, rblx: RobloxUser):
@@ -153,7 +153,7 @@ class ChangeAccountSettings(BaseView):
                     f"❌ **You need to update your account through bloxlink**"
                 ))
             
-            await interaction.edit_original_response(content=f"✅ **Roblox account updated through <@426537812993638400>.**", view=None)
+            await interaction.edit_original_response(content=f"✅ **Automatically updated.**", view=None)
 
             data.roblox_id = rblx_id
             return await interaction.client.database.update_user(data)
@@ -187,11 +187,11 @@ class ManageAccount(commands.Cog):
 
             if not rblx_id:
                 return await interaction.followup.send(content=(
-                    f"❌ **You are not verified through <@426537812993638400>. Once you verify with <@426537812993638400>, run this command again.**"
+                    f"❌ **You are not verified with <@426537812993638400>. Once you are verified (`/verify`), run this command again.**"
                 ))
             
             await interaction.followup.send(content=(
-                f"✅ **Roblox account updated because you are verified through <@426537812993638400>. Run this command again if you want to view or manage your settings.**"
+                f"✅ **You have been automatically verified. Run this command again if you want to view or manage your settings.**"
             ))
 
             data.roblox_id = rblx_id
