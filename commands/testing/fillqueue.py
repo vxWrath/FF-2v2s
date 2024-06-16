@@ -33,14 +33,8 @@ class FillQueue(commands.Cog):
             score=None
         )
 
-        config  = Config.get()
-        parent  = interaction.client.get_channel(config.THREAD_CHANNEL)
 
-        if not parent or not isinstance(parent, discord.TextChannel):
-            return
-
-        matchup = await interaction.client.queuer.join_queue(team, parent)
-        
+        await interaction.client.queuer.join_queue(team)
         await interaction.followup.send(content="matchup found")
         
 async def setup(bot: MatchMaker):

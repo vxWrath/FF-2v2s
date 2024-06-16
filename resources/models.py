@@ -53,6 +53,7 @@ class User(Model):
     roblox_id: Optional[int] = None
     trophies: int = 0
 
+    total_bans: int = 0
     banned: bool = False
     banned_until: Optional[datetime.datetime] = None
 

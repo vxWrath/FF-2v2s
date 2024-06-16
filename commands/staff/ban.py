@@ -1,10 +1,11 @@
+import datetime
 import discord
 
 from discord import app_commands, ui
 from discord.ext import commands
 from typing import Optional
 
-from resources import MatchMaker, Extras, admin_only
+from resources import MatchMaker, Extras, Colors, staff_only, Config
 
 class Ban(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -13,8 +14,9 @@ class Ban(commands.Cog):
     @app_commands.command(
         name="playban", 
         description="ban someone from playing 2v2s",
-        extras=Extras(defer_ephemerally=True, user_data=True),
+        extras=Extras(defer=True, user_data=True),
     )
+    @app_commands.describe(member="the member to ban from playing", time="how long the member should be banned")
     @app_commands.choices(time=[
         app_commands.Choice(name="12 hours", value=43200),
         app_commands.Choice(name="1 day", value=86400),
@@ -24,11 +26,53 @@ class Ban(commands.Cog):
         app_commands.Choice(name="30 days", value=2592000),
         app_commands.Choice(name="60 days", value=51840000),
         app_commands.Choice(name="90 days", value=7776000),
-        app_commands.Choice(name="Forever", value=0),
+        app_commands.Choice(name="Permanently", value=0),
     ])
-    @admin_only()
+    @staff_only()
     async def ban(self, interaction: discord.Interaction[MatchMaker], member: discord.Member, time: app_commands.Choice[int]):
-        pass
+        member_data  = interaction.extras['users'][member.id]
+        ban_update   = True if member_data.banned else False
+
+        member_data.total_bans  += 1
+        member_data.banned       = True
+        member_data.banned_until = None
+
+        if time.value == 0:
+            content = f"{member.mention} has been permanently banned from playing by {interaction.user.mention}"
+        else:
+            banned_until  = discord.utils.utcnow() + datetime.timedelta(seconds=time.value)
+            banned_until += datetime.timedelta(seconds=(60 - banned_until.minute) * 60 - banned_until.second) # round up to the nearest hour
+
+            member_data.banned_until = banned_until
+
+            content = f"{member.mention} has been temporarily banned from playing until {discord.utils.format_dt(banned_until, "f")} by {interaction.user.mention}"
+
+        if ban_update:
+            content += f" (ban update)"
+
+        await interaction.followup.send(content=content)
+        #await interaction.client.database.update_user(member_data)
+
+        embed = discord.Embed(
+            description = "## Member Banned",
+            color = Colors.ensure_color(member.color),
+            timestamp = discord.utils.utcnow()
+        )
+        embed.add_field(name="Member", value=f"{member.mention} ({member.id})", inline=True)
+        embed.add_field(name="Members Bans", value=f"`{member_data.total_bans}`", inline=True)
+
+        embed.add_field(name="Banned Until", value=(
+            f"{discord.utils.format_dt(banned_until, "f") if time.value else '`Permanently`'} "
+            f"{f"({discord.utils.format_dt(banned_until, "R")})" if time.value else ''}"
+        ), inline=False)
+
+        embed.add_field(name="Staff Member", value=f"{interaction.user.mention} ({interaction.user.id})", inline=True)
+        embed.add_field(name="Ban Update", value=f"{'✅' if ban_update else '❌'}", inline=True)
+
+        embed.set_footer(text="Banned at")
+
+        channel = interaction.client.get_channel(Config.get().BAN_LOG)
+        await channel.send(embed=embed)
         
 async def setup(bot: MatchMaker):
     cog = Ban(bot)

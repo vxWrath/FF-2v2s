@@ -226,7 +226,7 @@ def staff_only():
     async def pred(interaction: discord.Interaction[MatchMaker]) -> True:
         config = Config.get()
 
-        if interaction.user.id in config['ADMINS'] + config['DEVELOPERS'] or interaction.user.get_role(config['STAFF_ROLE']):
+        if interaction.user.id in config.ADMINS + config.DEVELOPERS or interaction.user.get_role(config.STAFF_ROLE):
             return True
         raise CheckFailure(CheckFailureType.staff)
         
@@ -236,7 +236,7 @@ def admin_only():
     async def pred(interaction: discord.Interaction[MatchMaker]) -> True:
         config = Config.get()
         
-        if interaction.user.id in config['ADMINS'] + config['DEVELOPERS']:
+        if interaction.user.id in config.ADMINS + config.DEVELOPERS:
             return True
         raise CheckFailure(CheckFailureType.admin)
         

@@ -10,7 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 from os import environ as env
 
-from resources import MatchMaker, MatchMakerException, CheckFailure, CheckFailureType, Unverified
+from resources import MatchMaker, MatchMakerException, CheckFailure, CheckFailureType, Unverified, MemberBanned
 
 logger = colorlog.getLogger("bot")
 
@@ -34,7 +34,17 @@ class Errors(commands.Cog):
                 "content": "⚠️ **You are not verified. Run /account to verify**",
                 "ephemeral": True,
             }
-            print('unverified')
+        elif isinstance(error, MemberBanned):
+            if error.data.banned_until:
+                kwargs = {
+                    "content": f"❌ **You are temporarily banned from playing 2v2s until {discord.utils.format_dt(error.data.banned_until, "f")}**",
+                    "ephemeral": True,
+                }
+            else:
+                kwargs = {
+                    "content": f"❌ **You are permanently banned from playing 2v2s**",
+                    "ephemeral": True,
+                }
         elif isinstance(error, CheckFailure):
             if error.type == CheckFailureType.staff:
                 kwargs = {

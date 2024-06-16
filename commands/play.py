@@ -7,7 +7,7 @@ import uuid
 from discord import app_commands, ui
 from discord.ext import commands
 
-from resources import MatchMaker, Object, Extras, User, Region, RobloxUser, BaseView, BaseModal, Colors, Config, Unverified
+from resources import MatchMaker, Object, Extras, User, Region, RobloxUser, BaseView, BaseModal, Colors, Config, Unverified, MemberBanned
 
 FOOTBALL_FUSION_LINK  = "https://www.roblox.com/games/8204899140/Football-Fusion-2#!/game-instances"
 FOOTBALL_FUSION_REGEX = re.compile(r"(?:https:\/\/www\.roblox\.com\/games\/8204899140\/football-fusion-2\?privateserverlinkcode=)([0-9]{25,})", flags=re.IGNORECASE)
@@ -273,7 +273,7 @@ class SelectTeammate(BaseView):
             private_server=self.private_server or invite.private_server,
             score=None
         )
-        match_making_task = interaction.client.loop.create_task(interaction.client.queuer.join_queue(team, parent))
+        match_making_task = interaction.client.loop.create_task(interaction.client.queuer.join_queue(team))
         
         done, pending = await asyncio.wait(
             [p1_task, p2_task, timeout_task, match_making_task],
@@ -471,6 +471,10 @@ class Play(commands.Cog):
     )
     async def play(self, interaction: discord.Interaction[MatchMaker]):
         data = interaction.extras['users'][interaction.user.id]
+
+        if data.banned:
+            raise MemberBanned(interaction.user, data)
+
         rblx = await self.bot.roblox_client.get_user(data.roblox_id)
         
         if not rblx:

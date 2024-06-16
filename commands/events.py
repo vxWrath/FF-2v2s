@@ -3,7 +3,7 @@ import asyncio
 
 from discord.ext import commands
 from discord import ui
-from resources import MatchMaker, Colors, Extras, BaseView, Config, Unverified
+from resources import MatchMaker, Colors, Extras, BaseView, Config, Unverified, MemberBanned
 from typing import Optional
 
 from .play import LinkOrSkip, FOOTBALL_FUSION_LINK
@@ -12,11 +12,15 @@ class Play(BaseView):
     def __init__(self):
         super().__init__(None, extras=Extras(defer=True, user_data=True))
 
-    @ui.select(cls=ui.Select, placeholder="Click here to find 2v2s", custom_id="play", min_values=0, options=[
-        discord.SelectOption(label="Create Party")
+    @ui.select(cls=ui.Select, placeholder="Click here to play", custom_id="play", min_values=0, options=[
+        discord.SelectOption(label="Create Party & Play")
     ])
     async def play(self, interaction: discord.Interaction[MatchMaker], _):
         data = interaction.extras['users'][interaction.user.id]
+
+        if data.banned:
+            raise MemberBanned(interaction.user, data)
+        
         rblx = await interaction.client.roblox_client.get_user(data.roblox_id)
         
         if not rblx:
@@ -75,7 +79,7 @@ class Events(commands.Cog):
 
         config = Config.get()
 
-        channel = self.bot.get_partial_messageable(config.PANEL_CHANNEL, guild_id=config.MAIN_GUILD, type=discord.ChannelType.text)
+        channel = self.bot.get_channel(config.PANEL_CHANNEL)
         message = channel.get_partial_message(config.PANEL_MESSAGE)
 
         embed = discord.Embed(
