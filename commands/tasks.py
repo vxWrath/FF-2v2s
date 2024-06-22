@@ -13,7 +13,8 @@ class Tasks(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
-        self.bot.loop.create_task(self.start_tasks())
+        if self.bot.production:
+            self.bot.loop.create_task(self.start_tasks())
 
     async def start_tasks(self):
         await self.bot.wait_until_ready()
@@ -161,11 +162,12 @@ class Tasks(commands.Cog):
 
         logger.debug("Finished auto-clear-state")
 
+    # TODO
+    # member unban task
+
     @auto_result.error
     @auto_clear_states.error
     async def error(self, error: Exception):
-        self.auto_result.cancel()
-
         logger.error("Task failed to finish", exc_info=error)
 
 async def setup(bot: MatchMaker):

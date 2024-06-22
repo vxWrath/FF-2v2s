@@ -21,7 +21,9 @@ class Config:
     def get() -> Object:
         if not Config.retreived:
             with open('config.json', 'r') as f:
-                return Object(json.load(f))
+                Config.retreived = True
+                Config.config    = Object(json.load(f))
+
         return Config.config
     
     @staticmethod

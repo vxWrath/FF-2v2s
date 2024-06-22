@@ -126,6 +126,15 @@ class Database:
             "team_two": team_two,
         })
         
+    async def get_match(self, match_id: int) -> Optional[Match]:
+        item = Object.from_mongo((await self.mongo.matchmaker["matches"].find_one({"id": str(match_id)}) or {}))
+        
+        if not item:
+            return
+        
+        item["id"] = item.pop("_id")
+        return Match(**item)
+    
     async def update_match(self, match: Match) -> None:
         items = match.dump_without_id()
         

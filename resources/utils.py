@@ -119,6 +119,7 @@ class DeleteMessageView(BaseView):
 class Colors:
     white   = discord.Color.from_str("#FFFFFF")
     blue    = discord.Color.from_str("#5896ff")
+    red     = discord.Color.from_str("#ff3939")
     blank   = discord.Color.from_str("#2B2D31")
     
     @staticmethod
@@ -138,8 +139,8 @@ class Colors:
             return Colors.blank
         
     @staticmethod
-    def ensure_color(color: discord.Color) -> discord.Color:
-        return color if color.value else Colors.blank
+    def ensure_color(color: discord.Color, default: Optional[discord.Color]=None) -> discord.Color:
+        return color if color.value else default or Colors.blank
 
 def _format_bot_message(message: discord.Message, prev: bool=False) -> str:
     if message.embeds:
@@ -222,11 +223,25 @@ def trophy_change(your_team, opponent_team) -> int:
     else:
         return int(numpy.clip(-base_change + trophy_factor * 10 + score_factor, -50, -10))
     
+def is_staff(member: discord.Member):
+    config = Config.get()
+    return is_admin(member) or member.get_role(config.STAFF_ROLE)
+
+def is_admin(member: discord.Member):
+    config = Config.get()
+    return member.id in config.ADMINS + config.DEVELOPERS
+
+def match_thread_only():
+    async def pred(interaction: discord.Interaction[MatchMaker]) -> True:
+        if interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent.id == Config.get().THREAD_CHANNEL:
+            return True
+        raise CheckFailure(CheckFailureType.staff)
+        
+    return discord.app_commands.check(pred)
+
 def staff_only():
     async def pred(interaction: discord.Interaction[MatchMaker]) -> True:
-        config = Config.get()
-
-        if interaction.user.id in config.ADMINS + config.DEVELOPERS or interaction.user.get_role(config.STAFF_ROLE):
+        if is_staff(interaction.user):
             return True
         raise CheckFailure(CheckFailureType.staff)
         
@@ -234,9 +249,7 @@ def staff_only():
 
 def admin_only():
     async def pred(interaction: discord.Interaction[MatchMaker]) -> True:
-        config = Config.get()
-        
-        if interaction.user.id in config.ADMINS + config.DEVELOPERS:
+        if is_admin(interaction.user):
             return True
         raise CheckFailure(CheckFailureType.admin)
         

@@ -7,11 +7,7 @@ import numpy
 from discord import app_commands
 from discord.ext import commands
 
-from resources import MatchMaker, Extras, Colors, Object, log_score, trophy_change, send_thread_log, Config, Unverified
-
-def is_thread(interaction: discord.Interaction) -> bool:
-    config = Config.get()
-    return interaction.channel.type == discord.ChannelType.private_thread and interaction.channel.parent.id == config.THREAD_CHANNEL
+from resources import MatchMaker, Extras, Colors, Object, log_score, trophy_change, send_thread_log, Config, Unverified, match_thread_only
 
 class Result(commands.Cog):
     def __init__(self, bot: MatchMaker):
@@ -24,7 +20,7 @@ class Result(commands.Cog):
     )
     @app_commands.describe(your_score="your team's score", opponents_score="your opponent's score")
     @app_commands.rename(your_score="your-score", opponents_score="opponents-score")
-    @app_commands.check(is_thread)
+    @match_thread_only()
     async def result(self, interaction: discord.Interaction[MatchMaker], 
         your_score: app_commands.Range[int, 0, 100], 
         opponents_score: app_commands.Range[int, 0, 100]

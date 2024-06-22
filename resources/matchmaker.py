@@ -3,10 +3,12 @@ import aiohttp
 import os
 import sys
 import colorlog
+import pytesseract
 
 import discord
 from discord.app_commands import Command, CommandTree, errors
 from discord.ext import commands
+from google.cloud import vision_v1
 
 intents = discord.Intents.none()
 intents.guilds  = True
@@ -21,6 +23,9 @@ from .objects import Object
 from .queue import Queue
 from .roblox import RobloxClient
 from .states import States
+
+pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = f"credentials.json"
 
 class MatchMaker(commands.Bot):
     def __init__(self):
@@ -38,6 +43,8 @@ class MatchMaker(commands.Bot):
         self.database         = Database()
         self.queuer           = Queue(self)
         self.states           = States(self)
+
+        self.vision_api       = vision_v1.ImageAnnotatorAsyncClient()
         
     async def setup_hook(self) -> None:
         self.loop.create_task(self.database.ping_loop())

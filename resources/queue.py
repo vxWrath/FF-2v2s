@@ -115,9 +115,11 @@ class Queue:
             await message.reply(content=f":bangbang: `Match ID:` **{match_id}**")
 
             match  = await self.database.create_match(match_id, discord.utils.utcnow(), item.team.region, thread.id, queue_item.team, item.team)
-            future = item.future.set_result(match)
             
-            return match
+            item.future.set_result(match)
+            queue_item.future.set_result(match)
+            
+            return True
 
     async def increment_loop(self, item: Object):
         while True:
@@ -136,32 +138,9 @@ class Queue:
             first_completed = done.pop()
 
             if first_completed == increment_task:
-                item.trophy_search_range += INCREMENT_RANGE
-
                 if item.trophy_search_range >= MAX_SEARCH_RANGE:
-                    return
-            else:
-                return increment_task.cancel()
-        
-    # TODO:
-    # reloop through the queue once an increment happens
-        
-    async def increment_loop(self, item: Object):
-        while True:
-            increment_task = self.bot.loop.create_task(asyncio.sleep(INCREMENT_INTERVAL))
-
-            done, _ = await asyncio.wait([increment_task, item.future], timeout=600, return_when=asyncio.FIRST_COMPLETED)
-
-            if not done:
-                return self.queue.remove(item)
-            
-            first_completed = done.pop()
-
-            if first_completed == increment_task:
+                    continue
                 item.trophy_search_range += INCREMENT_RANGE
-
-                if item.trophy_search_range >= MAX_SEARCH_RANGE:
-                    return
             else:
                 return increment_task.cancel()
 

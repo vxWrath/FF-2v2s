@@ -35,7 +35,8 @@ class States:
         for player_id in player_ids:
             if not self[player_id]:
                 self.states[player_id] = PlayerState(self.bot, new_action)
-            self.states[player_id].action = new_action
+            else:
+                self.states[player_id].action = new_action
 
     def remove(self, player_ids: List[int]):
         for player_id in player_ids:
